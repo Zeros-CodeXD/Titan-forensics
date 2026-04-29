@@ -3,74 +3,31 @@ import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
 from supabase import create_client, Client
+from streamlit_cookies_controller import CookieController
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V1", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V12", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
-    /* Cinematic Midnight Grid Background */
-    .stApp { 
-        background: radial-gradient(circle at top, #0f172a 0%, #020617 100%);
-        background-size: cover;
-        color: #e2e8f0; 
-    }
+    .stApp { background: radial-gradient(circle at top, #0f172a 0%, #020617 100%); background-size: cover; color: #e2e8f0; }
     h1, h2, h3 { color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;}
     div[data-testid="column"] { display: flex; align-items: center; }
-    
-    /* Master Button Reset - FORCING DARK TEXT ON ALL BUTTONS */
-    .stButton>button, .stButton>button * { 
-        border-radius: 6px; 
-        font-weight: 800; 
-        width: 100%; 
-        transition: all 0.2s ease; 
-        border: none !important;
-        color: #0f172a !important; 
-    }
-    
-    /* Add Button (Cyan Background) */
-    .add-btn .stButton>button { 
-        background: #0ea5e9 !important; 
-        box-shadow: 0px 4px 10px rgba(14, 165, 233, 0.3);
-    }
+    .stButton>button, .stButton>button * { border-radius: 6px; font-weight: 800; width: 100%; transition: all 0.2s ease; border: none !important; color: #0f172a !important; }
+    .add-btn .stButton>button { background: #0ea5e9 !important; box-shadow: 0px 4px 10px rgba(14, 165, 233, 0.3); }
     .add-btn .stButton>button:hover { background: #38bdf8 !important; transform: translateY(-2px); }
-    
-    /* Execute/Analyze Button (Blue Background) */
-    .action-btn .stButton>button {
-        background: #3b82f6 !important; 
-        box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.3);
-    }
+    .action-btn .stButton>button { background: #3b82f6 !important; box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.3); }
     .action-btn .stButton>button:hover { background: #60a5fa !important; transform: scale(1.02); }
-    
-    /* Remove Button (Red Background) */
-    .remove-btn .stButton>button {
-        background: #f87171 !important; 
-        box-shadow: 0px 4px 10px rgba(248, 113, 113, 0.2);
-    }
+    .remove-btn .stButton>button { background: #f87171 !important; box-shadow: 0px 4px 10px rgba(248, 113, 113, 0.2); }
     .remove-btn .stButton>button:hover { background: #fca5a5 !important; transform: scale(1.02); }
-    
     .auth-box { background: #0f172a; padding: 2rem; border-radius: 8px; border: 1px solid #1e293b; border-left: 4px solid #3b82f6; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
-    
-    /* Massive Hero Header */
-    .hero-title {
-        text-align: center;
-        padding: 3rem 0 1rem 0;
-    }
-    .hero-title h1 {
-        font-size: 4.5rem;
-        margin-bottom: 0;
-        text-shadow: 0px 0px 20px rgba(14, 165, 233, 0.4);
-    }
-    .hero-title h3 {
-        color: #64748b;
-        margin-top: 0;
-        letter-spacing: 5px;
-        font-size: 1.2rem;
-    }
+    .hero-title { text-align: center; padding: 3rem 0 1rem 0; }
+    .hero-title h1 { font-size: 4.5rem; margin-bottom: 0; text-shadow: 0px 0px 20px rgba(14, 165, 233, 0.4); }
+    .hero-title h3 { color: #64748b; margin-top: 0; letter-spacing: 5px; font-size: 1.2rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SUPABASE CONNECTION ---
+# --- 2. CLOUD INFRASTRUCTURE ---
 @st.cache_resource
 def init_connection():
     url = st.secrets["SUPABASE_URL"]
@@ -78,8 +35,9 @@ def init_connection():
     return create_client(url, key)
 
 supabase = init_connection()
+cookie_controller = CookieController() # Initialize the Browser Cookie Manager
 
-# --- 3. DATA DICTIONARIES (WITH DOMAINS) ---
+# --- 3. DATA DICTIONARIES ---
 TICKER_DATA = {
     "AAPL": {"name": "Apple Inc.", "domain": "apple.com", "sector": "Technology"},
     "MSFT": {"name": "Microsoft", "domain": "microsoft.com", "sector": "Technology"},
@@ -109,11 +67,19 @@ TICKER_DATA = {
 }
 DEFAULT_TICKERS = list(TICKER_DATA.keys())
 
-# --- 4. SESSION STATE ---
-if 'user_email' not in st.session_state: st.session_state.user_email = None
+# --- 4. SESSION & COOKIE STATE MANAGEMENT ---
 if 'current_view' not in st.session_state: st.session_state.current_view = 'home'
 if 'active_ticker' not in st.session_state: st.session_state.active_ticker = None
 if 'my_tickers' not in st.session_state: st.session_state.my_tickers = DEFAULT_TICKERS.copy()
+
+# Automatically check for existing browser cookies on boot
+saved_cookie = cookie_controller.get("titan_session")
+
+if 'user_email' not in st.session_state: 
+    if saved_cookie:
+        st.session_state.user_email = saved_cookie
+    else:
+        st.session_state.user_email = None
 
 # --- 5. SECURE DATABASE & CACHING LOGIC ---
 def load_user_data():
@@ -136,6 +102,10 @@ def get_cached_history(ticker_sym):
         return stock.history(period="3mo")
     except Exception:
         return pd.DataFrame()
+
+# If the app just booted up from a cookie, make sure we pull their specific data
+if st.session_state.user_email and st.session_state.my_tickers == DEFAULT_TICKERS:
+    load_user_data()
 
 # --- 6. AUTHENTICATION GATEWAY ---
 if st.session_state.user_email is None:
@@ -160,7 +130,11 @@ if st.session_state.user_email is None:
             elif auth_mode == "Authenticate":
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    # 1. Update session
                     st.session_state.user_email = res.user.email
+                    # 2. Write the cookie to the browser so they never have to log in again
+                    cookie_controller.set("titan_session", res.user.email)
+                    # 3. Pull their data
                     load_user_data() 
                     st.rerun() 
                 except Exception as e:
@@ -192,8 +166,13 @@ else:
         st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 6px; border-left: 3px solid #3b82f6; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
         st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
         if st.button("🔒 TERMINATE SESSION"):
+            # 1. Sign out of database
             supabase.auth.sign_out()
+            # 2. Delete the browser cookie
+            cookie_controller.remove("titan_session")
+            # 3. Wipe memory
             st.session_state.user_email = None
+            st.session_state.my_tickers = DEFAULT_TICKERS.copy()
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -219,17 +198,13 @@ else:
         
         for ticker in st.session_state.my_tickers:
             t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset", "domain": ""})
-            
-            # --- BULLETPROOF GOOGLE FAVICON & FALLBACK LOGIC ---
             domain = t_info.get("domain", "")
             fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9&bold=true"
-            # Using Google's S2 Favicon API which won't block Streamlit
             logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else fallback_url
             
             col1, col2, col3, col4 = st.columns([1.5, 3.5, 2, 1.5])
             
             with col1: 
-                # Notice the 'onerror' JS attribute - if Google fails, it auto-swaps to the UI Avatar!
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">
                         <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="30" height="30" style="border-radius: 6px; object-fit: contain; background-color: #ffffff; padding: 2px;">
@@ -254,8 +229,6 @@ else:
     elif st.session_state.current_view == 'detail':
         ticker_sym = st.session_state.active_ticker
         t_info = TICKER_DATA.get(ticker_sym, {"name": "", "domain": ""})
-        
-        # --- BULLETPROOF GOOGLE FAVICON & FALLBACK LOGIC ---
         domain = t_info.get("domain", "")
         fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9&bold=true"
         logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else fallback_url
