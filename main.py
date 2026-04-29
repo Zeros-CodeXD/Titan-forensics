@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
+import plotly.express as px
 from supabase import create_client, Client
 
 # --- 1. SETTINGS & HIGH-END CSS ---
-st.set_page_config(page_title="Titan V6", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V7", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
@@ -15,39 +16,42 @@ st.markdown("""
         background-size: cover;
         color: #e2e8f0; 
     }
-    
-    /* Glowing Headers */
     h1, h2, h3 { color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;}
-    
-    /* Center Layout Alignment */
     div[data-testid="column"] { display: flex; align-items: center; }
     
-    /* Master Button Reset */
-    .stButton>button { border-radius: 4px; font-weight: bold; width: 100%; transition: all 0.3s ease; }
-    
-    /* The "Add to Index" High-Contrast Button */
-    .add-btn .stButton>button { 
-        background: #06b6d4; /* Neon Cyan */
-        color: #000000; 
-        border: none; 
-        box-shadow: 0px 0px 10px rgba(6, 182, 212, 0.4);
+    /* Terminal Button Reset */
+    .stButton>button { 
+        border-radius: 2px; 
+        font-family: 'Courier New', Courier, monospace; 
+        font-weight: bold; 
+        width: 100%; 
+        transition: all 0.2s ease; 
     }
-    .add-btn .stButton>button:hover { background: #0891b2; transform: scale(1.02); }
     
-    /* The "Remove" Minimalist Button */
+    /* Add/Execute Buttons */
+    .add-btn .stButton>button { 
+        background: #06b6d4; color: #000000; border: none; 
+        box-shadow: 0px 0px 8px rgba(6, 182, 212, 0.4);
+    }
+    .add-btn .stButton>button:hover { background: #0891b2; }
+    
+    /* Terminal Action Buttons */
+    .action-btn .stButton>button {
+        background: transparent;
+        border: 1px solid #38bdf8;
+        color: #38bdf8;
+    }
+    .action-btn .stButton>button:hover { background: rgba(56, 189, 248, 0.1); }
+    
+    /* Terminal Drop Buttons */
     .remove-btn .stButton>button {
         background: transparent;
-        border: 1px solid #334155;
+        border: 1px solid #ef4444;
         color: #ef4444;
     }
-    .remove-btn .stButton>button:hover {
-        background: #7f1d1d;
-        border-color: #ef4444;
-        box-shadow: 0px 0px 8px rgba(239, 68, 68, 0.5);
-    }
+    .remove-btn .stButton>button:hover { background: rgba(239, 68, 68, 0.1); }
     
-    /* Auth Box Styling */
-    .auth-box { background: #0f172a; padding: 2rem; border-radius: 8px; border: 1px solid #1e293b; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
+    .auth-box { background: #0f172a; padding: 2rem; border-radius: 4px; border: 1px solid #1e293b; border-left: 4px solid #06b6d4;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,30 +64,43 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- 3. DATA DICTIONARIES ---
-TICKER_NAMES = {
-    "AAPL": "Apple Inc.", "MSFT": "Microsoft", "GOOGL": "Alphabet (Google)",
-    "AMZN": "Amazon", "META": "Meta Platforms", "TSLA": "Tesla",
-    "NVDA": "NVIDIA", "NFLX": "Netflix", "AMD": "Advanced Micro Devices",
-    "INTC": "Intel", "BA": "Boeing", "DIS": "Disney", "V": "Visa",
-    "JPM": "JPMorgan Chase", "WMT": "Walmart", "T": "AT&T",
-    "XOM": "Exxon Mobil", "CVX": "Chevron", "PG": "Procter & Gamble",
-    "KO": "Coca-Cola", "PEP": "PepsiCo", "CSCO": "Cisco",
-    "PFE": "Pfizer", "MRK": "Merck", "ABBV": "AbbVie"
+# --- 3. DATA DICTIONARIES (WITH SECTORS) ---
+TICKER_DATA = {
+    "AAPL": {"name": "Apple Inc.", "sector": "Technology"},
+    "MSFT": {"name": "Microsoft", "sector": "Technology"},
+    "GOOGL": {"name": "Alphabet", "sector": "Communication"},
+    "AMZN": {"name": "Amazon", "sector": "Consumer Cyclical"},
+    "META": {"name": "Meta Platforms", "sector": "Communication"},
+    "TSLA": {"name": "Tesla", "sector": "Consumer Cyclical"},
+    "NVDA": {"name": "NVIDIA", "sector": "Technology"},
+    "NFLX": {"name": "Netflix", "sector": "Communication"},
+    "AMD": {"name": "Advanced Micro Devices", "sector": "Technology"},
+    "INTC": {"name": "Intel", "sector": "Technology"},
+    "BA": {"name": "Boeing", "sector": "Industrials"},
+    "DIS": {"name": "Disney", "sector": "Communication"},
+    "V": {"name": "Visa", "sector": "Financials"},
+    "JPM": {"name": "JPMorgan Chase", "sector": "Financials"},
+    "WMT": {"name": "Walmart", "sector": "Consumer Defensive"},
+    "T": {"name": "AT&T", "sector": "Communication"},
+    "XOM": {"name": "Exxon Mobil", "sector": "Energy"},
+    "CVX": {"name": "Chevron", "sector": "Energy"},
+    "PG": {"name": "Procter & Gamble", "sector": "Consumer Defensive"},
+    "KO": {"name": "Coca-Cola", "sector": "Consumer Defensive"},
+    "PEP": {"name": "PepsiCo", "sector": "Consumer Defensive"},
+    "CSCO": {"name": "Cisco", "sector": "Technology"},
+    "PFE": {"name": "Pfizer", "sector": "Healthcare"},
+    "MRK": {"name": "Merck", "sector": "Healthcare"},
+    "ABBV": {"name": "AbbVie", "sector": "Healthcare"}
 }
-DEFAULT_TICKERS = list(TICKER_NAMES.keys())
+DEFAULT_TICKERS = list(TICKER_DATA.keys())
 
-# --- 4. SESSION STATE MANAGEMENT ---
-if 'user_email' not in st.session_state:
-    st.session_state.user_email = None
-if 'current_view' not in st.session_state:
-    st.session_state.current_view = 'home'
-if 'active_ticker' not in st.session_state:
-    st.session_state.active_ticker = None
-if 'my_tickers' not in st.session_state:
-    st.session_state.my_tickers = DEFAULT_TICKERS.copy()
+# --- 4. SESSION STATE ---
+if 'user_email' not in st.session_state: st.session_state.user_email = None
+if 'current_view' not in st.session_state: st.session_state.current_view = 'home'
+if 'active_ticker' not in st.session_state: st.session_state.active_ticker = None
+if 'my_tickers' not in st.session_state: st.session_state.my_tickers = DEFAULT_TICKERS.copy()
 
-# --- 5. SECURE DATABASE LOGIC ---
+# --- 5. DATABASE LOGIC ---
 def load_user_data():
     if st.session_state.user_email:
         response = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
@@ -95,121 +112,125 @@ def load_user_data():
 
 def save_user_data():
     if st.session_state.user_email:
-        supabase.table("secure_watchlists").upsert({
-            "email": st.session_state.user_email, 
-            "tickers": st.session_state.my_tickers
-        }).execute()
+        supabase.table("secure_watchlists").upsert({"email": st.session_state.user_email, "tickers": st.session_state.my_tickers}).execute()
 
-# --- 6. AUTHENTICATION UI (THE LOGIN GATEWAY) ---
+# --- 6. AUTHENTICATION GATEWAY ---
 if st.session_state.user_email is None:
-    # Big customized Title
     st.markdown("<h1 style='text-align: center;'><span style='font-size: 1.2em; color: #06b6d4;'>⚛</span> TITAN FORENSICS</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Institutional Terminal • Authorized Personnel Only</p>", unsafe_allow_html=True)
-    st.write("")
+    st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Institutional Terminal • Authorized Personnel Only</p><br>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown('<div class="auth-box">', unsafe_allow_html=True)
-        auth_mode = st.radio("Access Level:", ["Login", "Request Access (Sign Up)"], horizontal=True)
-        email = st.text_input("Corporate Email")
-        password = st.text_input("Security Key (Password)", type="password")
+        auth_mode = st.radio("System Access:", ["Authenticate", "Request Allocation"], horizontal=True)
+        email = st.text_input("Operator ID (Email)")
+        password = st.text_input("Encryption Key (Password)", type="password")
         
-        if st.button("Establish Connection", type="primary"):
-            if auth_mode == "Request Access (Sign Up)":
+        if st.button("[~] INITIATE HANDSHAKE", type="primary"):
+            if auth_mode == "Request Allocation":
                 try:
                     supabase.auth.sign_up({"email": email, "password": password})
-                    st.success("Credentials Registered. You may now log in.")
+                    st.success("Credentials logged. Proceed to authenticate.")
                 except Exception as e:
                     st.error(f"Registration Error: {e}")
-            
-            elif auth_mode == "Login":
+            elif auth_mode == "Authenticate":
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                     st.session_state.user_email = res.user.email
                     load_user_data() 
                     st.rerun() 
                 except Exception as e:
-                    st.error("Connection Refused. Invalid credentials.")
+                    st.error("ERR_CONNECTION_REFUSED: Invalid credentials.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 7. THE TERMINAL (ONLY VISIBLE IF LOGGED IN) ---
+# --- 7. THE TERMINAL ---
 else:
     def go_to_detail(ticker):
         st.session_state.active_ticker = ticker
         st.session_state.current_view = 'detail'
-
     def go_to_home():
         st.session_state.active_ticker = None
         st.session_state.current_view = 'home'
-
     def remove_ticker(ticker):
         if ticker in st.session_state.my_tickers:
             st.session_state.my_tickers.remove(ticker)
             save_user_data()
-
     def add_ticker(new_ticker):
         if new_ticker and new_ticker not in st.session_state.my_tickers:
             if len(st.session_state.my_tickers) < 50:
                 st.session_state.my_tickers.insert(0, new_ticker)
                 save_user_data()
             else:
-                st.error("Watchlist capacity reached (Max 50).")
+                st.error("ERR_MEMORY_FULL: Max 50 assets permitted.")
 
-    # Upgraded Sidebar
     with st.sidebar:
-        st.markdown("### 🔒 Terminal Access Control")
-        st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 5px; border-left: 3px solid #06b6d4;'><b>Active User:</b><br>{st.session_state.user_email}</div>", unsafe_allow_html=True)
-        st.write("")
-        if st.button("Sever Connection (Logout)"):
+        st.markdown("### ⎈ ACCESS CONTROL")
+        st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 2px; border-left: 2px solid #06b6d4; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
+        if st.button("[x] TERMINATE SESSION"):
             supabase.auth.sign_out()
             st.session_state.user_email = None
             st.rerun()
 
-    # --- HOME PAGE (INDEX VIEW) ---
+    # --- HOME PAGE (COMMAND CENTER) ---
     if st.session_state.current_view == 'home':
-        st.markdown("<h1><span style='font-size: 1.2em; color: #06b6d4;'>⚛</span> TITAN COMMAND CENTER</h1>", unsafe_allow_html=True)
+        st.markdown("<h1><span style='color: #06b6d4;'>⚛</span> COMMAND NODE</h1>", unsafe_allow_html=True)
         
-        st.subheader("➕ Target New Asset")
+        # New Sector Analytics Matrix
+        sector_counts = {}
+        for t in st.session_state.my_tickers:
+            sec = TICKER_DATA.get(t, {}).get("sector", "Custom / Unclassified")
+            sector_counts[sec] = sector_counts.get(sec, 0) + 1
+            
+        st.markdown("### ◴ SECTOR ALLOCATION MATRIX")
+        if sector_counts:
+            fig = px.pie(names=list(sector_counts.keys()), values=list(sector_counts.values()), hole=0.6, color_discrete_sequence=px.colors.sequential.Cyan)
+            fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=20, b=20, l=0, r=0), height=300)
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.divider()
+
+        st.subheader("⎘ INJECT NEW ASSET")
         c1, c2 = st.columns([4, 1])
         with c1:
-            new_asset = st.text_input("Search ticker symbol (e.g., PLTR, SPY):", label_visibility="collapsed").strip().upper()
+            new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY):", label_visibility="collapsed").strip().upper()
         with c2:
             st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-            if st.button("Add to Index"):
+            if st.button("[+] APPEND"):
                 add_ticker(new_asset)
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        st.divider()
-        st.subheader(f"📊 Live Watchlist ({len(st.session_state.my_tickers)}/50)")
+        st.write("")
+        st.subheader(f"≣ ACTIVE WATCHLIST ({len(st.session_state.my_tickers)}/50)")
         
         for ticker in st.session_state.my_tickers:
-            full_name = TICKER_NAMES.get(ticker, "Custom Asset")
-            col1, col2, col3, col4 = st.columns([1, 4, 1.5, 1])
+            t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset"})
+            col1, col2, col3, col4 = st.columns([1, 4, 2, 1.5])
             
             with col1: st.markdown(f"**{ticker}**")
-            with col2: st.markdown(f"<span style='color: #94a3b8;'>({full_name})</span>", unsafe_allow_html=True)
-            with col3: st.button("🔍 Analyze", key=f"view_{ticker}", type="primary", on_click=go_to_detail, args=(ticker,))
+            with col2: st.markdown(f"<span style='color: #94a3b8;'>{t_info['name']}</span>", unsafe_allow_html=True)
             
-            # New styled remove button
+            with col3: 
+                st.markdown('<div class="action-btn">', unsafe_allow_html=True)
+                st.button("[~] EXECUTE", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
+                st.markdown('</div>', unsafe_allow_html=True)
             with col4: 
                 st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-                st.button("🗑️", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
+                st.button("[x] DROP", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
-                
-            st.markdown("<hr style='margin: 0.5em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 0.2em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
 
     # --- DETAIL PAGE ---
     elif st.session_state.current_view == 'detail':
         ticker_sym = st.session_state.active_ticker
-        full_name = TICKER_NAMES.get(ticker_sym, "")
-        title_display = f"{ticker_sym} ({full_name})" if full_name else ticker_sym
+        t_info = TICKER_DATA.get(ticker_sym, {"name": ""})
+        title_display = f"{ticker_sym} // {t_info['name']}" if t_info['name'] else ticker_sym
         
         c1, c2 = st.columns([4, 1])
-        with c1: st.markdown(f"<h1><span style='font-size: 1.2em; color: #06b6d4;'>⚛</span> {title_display}</h1>", unsafe_allow_html=True)
-        with c2: st.button("⬅ Return to Command", on_click=go_to_home, use_container_width=True)
+        with c1: st.markdown(f"<h1><span style='color: #06b6d4;'>⚛</span> {title_display}</h1>", unsafe_allow_html=True)
+        with c2: st.button("[<] RETURN", on_click=go_to_home, use_container_width=True)
         
-        with st.spinner(f"Establishing secure link to exchange data for {ticker_sym}..."):
+        with st.spinner(f"Establishing secure telemetry for {ticker_sym}..."):
             stock = yf.Ticker(ticker_sym)
             df = stock.history(period="3mo")
             
@@ -224,12 +245,12 @@ else:
             m1.metric("Latest Close", f"${latest_close:,.2f}", f"${price_delta:,.2f}")
             m2.metric("Latest Open", f"${latest_open:,.2f}")
             m3.metric("Daily Trade Volume", f"{latest_vol:,.0f}")
-            m4.metric("Tracking Window", "90 Days")
+            m4.metric("Telemetry Window", "90 Days")
             st.write("---")
             
-            chart_type = st.radio("Visualization Matrix:", ["Standard (Line/Bar)", "Pro (Candlestick)"], horizontal=True)
+            chart_type = st.radio("Visualization Matrix:", ["Standard Output", "Pro (Candlestick)"], horizontal=True)
             
-            if chart_type == "Standard (Line/Bar)":
+            if chart_type == "Standard Output":
                 col1, col2 = st.columns([2, 1])
                 with col1: 
                     st.markdown("**Price Action Trend**")
@@ -240,7 +261,7 @@ else:
             else: 
                 st.markdown("**Candlestick Price Action**")
                 fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
-                fig.update_layout(template="plotly_dark", margin=dict(l=0, r=0, t=0, b=0), height=400)
+                fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0), height=400)
                 st.plotly_chart(fig, use_container_width=True)
         else:
-            st.error(f"Terminal Error: Asset data for {ticker_sym} could not be retrieved. Link severed.")
+            st.error(f"ERR_DATA_NULL: Telemetry for {ticker_sym} failed. Asset may be delisted.")
