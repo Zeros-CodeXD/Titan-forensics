@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V10", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
