@@ -3,3 +3,4 @@ pandas
 yfinance
 plotly
 supabase
+streamlit-cookies-controller
