@@ -25,7 +25,7 @@ st.markdown("""
         width: 100%; 
         transition: all 0.2s ease; 
         border: none !important;
-        color: #0f172a !important; /* This guarantees no white text */
+        color: #0f172a !important; 
     }
     
     /* Add Button (Cyan Background) */
@@ -79,33 +79,33 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- 3. DATA DICTIONARIES (WITH SECTORS) ---
+# --- 3. DATA DICTIONARIES (WITH DOMAINS) ---
 TICKER_DATA = {
-    "AAPL": {"name": "Apple Inc.", "sector": "Technology"},
-    "MSFT": {"name": "Microsoft", "sector": "Technology"},
-    "GOOGL": {"name": "Alphabet", "sector": "Communication"},
-    "AMZN": {"name": "Amazon", "sector": "Consumer Cyclical"},
-    "META": {"name": "Meta Platforms", "sector": "Communication"},
-    "TSLA": {"name": "Tesla", "sector": "Consumer Cyclical"},
-    "NVDA": {"name": "NVIDIA", "sector": "Technology"},
-    "NFLX": {"name": "Netflix", "sector": "Communication"},
-    "AMD": {"name": "Advanced Micro Devices", "sector": "Technology"},
-    "INTC": {"name": "Intel", "sector": "Technology"},
-    "BA": {"name": "Boeing", "sector": "Industrials"},
-    "DIS": {"name": "Disney", "sector": "Communication"},
-    "V": {"name": "Visa", "sector": "Financials"},
-    "JPM": {"name": "JPMorgan Chase", "sector": "Financials"},
-    "WMT": {"name": "Walmart", "sector": "Consumer Defensive"},
-    "T": {"name": "AT&T", "sector": "Communication"},
-    "XOM": {"name": "Exxon Mobil", "sector": "Energy"},
-    "CVX": {"name": "Chevron", "sector": "Energy"},
-    "PG": {"name": "Procter & Gamble", "sector": "Consumer Defensive"},
-    "KO": {"name": "Coca-Cola", "sector": "Consumer Defensive"},
-    "PEP": {"name": "PepsiCo", "sector": "Consumer Defensive"},
-    "CSCO": {"name": "Cisco", "sector": "Technology"},
-    "PFE": {"name": "Pfizer", "sector": "Healthcare"},
-    "MRK": {"name": "Merck", "sector": "Healthcare"},
-    "ABBV": {"name": "AbbVie", "sector": "Healthcare"}
+    "AAPL": {"name": "Apple Inc.", "domain": "apple.com", "sector": "Technology"},
+    "MSFT": {"name": "Microsoft", "domain": "microsoft.com", "sector": "Technology"},
+    "GOOGL": {"name": "Alphabet", "domain": "abc.xyz", "sector": "Communication"},
+    "AMZN": {"name": "Amazon", "domain": "amazon.com", "sector": "Consumer Cyclical"},
+    "META": {"name": "Meta Platforms", "domain": "meta.com", "sector": "Communication"},
+    "TSLA": {"name": "Tesla", "domain": "tesla.com", "sector": "Consumer Cyclical"},
+    "NVDA": {"name": "NVIDIA", "domain": "nvidia.com", "sector": "Technology"},
+    "NFLX": {"name": "Netflix", "domain": "netflix.com", "sector": "Communication"},
+    "AMD": {"name": "Advanced Micro Devices", "domain": "amd.com", "sector": "Technology"},
+    "INTC": {"name": "Intel", "domain": "intel.com", "sector": "Technology"},
+    "BA": {"name": "Boeing", "domain": "boeing.com", "sector": "Industrials"},
+    "DIS": {"name": "Disney", "domain": "thewaltdisneycompany.com", "sector": "Communication"},
+    "V": {"name": "Visa", "domain": "visa.com", "sector": "Financials"},
+    "JPM": {"name": "JPMorgan Chase", "domain": "jpmorganchase.com", "sector": "Financials"},
+    "WMT": {"name": "Walmart", "domain": "walmart.com", "sector": "Consumer Defensive"},
+    "T": {"name": "AT&T", "domain": "att.com", "sector": "Communication"},
+    "XOM": {"name": "Exxon Mobil", "domain": "exxonmobil.com", "sector": "Energy"},
+    "CVX": {"name": "Chevron", "domain": "chevron.com", "sector": "Energy"},
+    "PG": {"name": "Procter & Gamble", "domain": "pg.com", "sector": "Consumer Defensive"},
+    "KO": {"name": "Coca-Cola", "domain": "coca-colacompany.com", "sector": "Consumer Defensive"},
+    "PEP": {"name": "PepsiCo", "domain": "pepsico.com", "sector": "Consumer Defensive"},
+    "CSCO": {"name": "Cisco", "domain": "cisco.com", "sector": "Technology"},
+    "PFE": {"name": "Pfizer", "domain": "pfizer.com", "sector": "Healthcare"},
+    "MRK": {"name": "Merck", "domain": "merck.com", "sector": "Healthcare"},
+    "ABBV": {"name": "AbbVie", "domain": "abbvie.com", "sector": "Healthcare"}
 }
 DEFAULT_TICKERS = list(TICKER_DATA.keys())
 
@@ -200,7 +200,6 @@ else:
     # --- HOME PAGE (COMMAND CENTER) ---
     if st.session_state.current_view == 'home':
         
-        # Massive Hero Header Replaces Pie Chart
         st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS TERMINAL</h3></div>", unsafe_allow_html=True)
         st.divider()
 
@@ -219,11 +218,25 @@ else:
         st.subheader(f"≣ ACTIVE WATCHLIST ({len(st.session_state.my_tickers)}/50)")
         
         for ticker in st.session_state.my_tickers:
-            t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset"})
-            col1, col2, col3, col4 = st.columns([1, 4, 2, 1.5])
+            t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset", "domain": ""})
             
-            with col1: st.markdown(f"**{ticker}**")
-            with col2: st.markdown(f"<span style='color: #94a3b8;'>{t_info['name']}</span>", unsafe_allow_html=True)
+            # --- LOGO FETCHING LOGIC ---
+            domain = t_info.get("domain", "")
+            # Fetches logo if domain exists, otherwise creates a fallback avatar
+            logo_url = f"https://logo.clearbit.com/{domain}" if domain else f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9"
+            
+            col1, col2, col3, col4 = st.columns([1.5, 3.5, 2, 1.5])
+            
+            with col1: 
+                st.markdown(f"""
+                    <div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">
+                        <img src="{logo_url}" width="30" height="30" style="border-radius: 6px; object-fit: contain; background-color: #ffffff; padding: 2px;">
+                        <span style="font-weight: bold; font-size: 1.1em;">{ticker}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+            with col2: 
+                st.markdown(f"<div style='color: #94a3b8; padding-top: 8px;'>{t_info['name']}</div>", unsafe_allow_html=True)
             
             with col3: 
                 st.markdown('<div class="action-btn">', unsafe_allow_html=True)
@@ -238,16 +251,26 @@ else:
     # --- DETAIL PAGE ---
     elif st.session_state.current_view == 'detail':
         ticker_sym = st.session_state.active_ticker
-        t_info = TICKER_DATA.get(ticker_sym, {"name": ""})
-        title_display = f"{ticker_sym} // {t_info['name']}" if t_info['name'] else ticker_sym
+        t_info = TICKER_DATA.get(ticker_sym, {"name": "", "domain": ""})
+        
+        domain = t_info.get("domain", "")
+        logo_url = f"https://logo.clearbit.com/{domain}" if domain else f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9"
         
         c1, c2 = st.columns([4, 1])
-        with c1: st.markdown(f"<h1><span style='color: #0ea5e9;'>⚛</span> {title_display}</h1>", unsafe_allow_html=True)
+        with c1: 
+            st.markdown(f"""
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="{logo_url}" width="40" height="40" style="border-radius: 8px; object-fit: contain; background-color: #ffffff; padding: 2px;">
+                    <h1 style="margin: 0;"><span style='color: #0ea5e9;'>⚛</span> {ticker_sym} <span style="font-size: 0.6em; color: #64748b;">// {t_info['name']}</span></h1>
+                </div>
+            """, unsafe_allow_html=True)
+            
         with c2: 
             st.markdown('<div class="action-btn">', unsafe_allow_html=True)
             st.button("⬅ RETURN", on_click=go_to_home, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
+        st.write("")
         with st.spinner(f"Establishing secure telemetry for {ticker_sym}..."):
             df = get_cached_history(ticker_sym)
             
