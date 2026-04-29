@@ -5,7 +5,7 @@
 ---
 
 ## 🚀 LIVE DEPLOYMENT
-**Access the terminal here:** [PASTE_YOUR_STREAMLIT_LINK_HERE]
+**Access the terminal here:** [https://titan-forensics-zeros-codexd.streamlit.app/]
 
 ---
 
