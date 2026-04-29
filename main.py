@@ -6,7 +6,7 @@ from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V12", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
