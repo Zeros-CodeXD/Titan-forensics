@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from supabase import create_client, Client
 
-# --- 1. SETTINGS & MODERN SAAS CSS ---
+# --- 1. SETTINGS & MODERN APP CSS ---
 st.set_page_config(page_title="Titan V8", page_icon="⚛", layout="wide")
 
 st.markdown("""
@@ -22,38 +22,37 @@ st.markdown("""
     /* Master Button Reset */
     .stButton>button { 
         border-radius: 6px; 
-        font-weight: 600; 
+        font-weight: 800; 
         width: 100%; 
         transition: all 0.2s ease; 
-        border: none;
+        border: none !important;
     }
     
-    /* Add Button - Cyan */
+    /* Add Button (Cyan, Dark Text) */
     .add-btn .stButton>button { 
-        background-color: #06b6d4; 
-        color: #000000; 
-        box-shadow: 0px 4px 10px rgba(6, 182, 212, 0.3);
+        background: #0ea5e9 !important; 
+        color: #0f172a !important; 
+        box-shadow: 0px 4px 10px rgba(14, 165, 233, 0.3);
     }
-    .add-btn .stButton>button:hover { background-color: #0891b2; transform: translateY(-1px); }
+    .add-btn .stButton>button:hover { background: #38bdf8 !important; transform: translateY(-2px); }
     
-    /* Execute Button - Electric Blue */
+    /* Execute/View Button (Blue, Dark Text) */
     .action-btn .stButton>button {
-        background-color: #3b82f6;
-        color: #ffffff;
-        box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.2);
+        background: #3b82f6 !important; 
+        color: #0f172a !important; 
+        box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.3);
     }
-    .action-btn .stButton>button:hover { background-color: #2563eb; transform: translateY(-1px); }
+    .action-btn .stButton>button:hover { background: #60a5fa !important; transform: scale(1.02); }
     
-    /* Remove Button - Soft Red (Not Deep Red) */
+    /* Remove Button (Soft Red, Dark Text) */
     .remove-btn .stButton>button {
-        background-color: #ef4444;
-        color: #ffffff;
-        box-shadow: 0px 4px 10px rgba(239, 68, 68, 0.2);
+        background: #f87171 !important; 
+        color: #0f172a !important; 
+        box-shadow: 0px 4px 10px rgba(248, 113, 113, 0.2);
     }
-    .remove-btn .stButton>button:hover { background-color: #dc2626; transform: translateY(-1px); }
+    .remove-btn .stButton>button:hover { background: #fca5a5 !important; transform: scale(1.02); }
     
-    /* Login Box */
-    .auth-box { background: #0f172a; padding: 2.5rem; border-radius: 8px; border: 1px solid #1e293b; border-top: 4px solid #38bdf8; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
+    .auth-box { background: #0f172a; padding: 2rem; border-radius: 8px; border: 1px solid #1e293b; border-left: 4px solid #3b82f6; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
     </style>
 """, unsafe_allow_html=True)
 
@@ -126,10 +125,8 @@ def get_cached_history(ticker_sym):
 
 # --- 6. AUTHENTICATION GATEWAY ---
 if st.session_state.user_email is None:
-    st.write("")
-    st.write("")
-    st.markdown("<h1 style='text-align: center;'><span style='font-size: 1.2em; color: #38bdf8;'>⚛</span> TITAN FORENSICS</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 1.1rem;'>Secure Institutional Terminal • Authorized Personnel Only</p><br>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'><span style='font-size: 1.2em; color: #0ea5e9;'>⚛</span> TITAN FORENSICS</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Institutional Terminal • Authorized Personnel Only</p><br>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -138,8 +135,8 @@ if st.session_state.user_email is None:
         email = st.text_input("Operator ID (Email)")
         password = st.text_input("Encryption Key (Password)", type="password")
         
-        st.write("")
-        if st.button("Initiate Handshake", type="primary"):
+        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
+        if st.button("⚡ INITIATE HANDSHAKE"):
             if auth_mode == "Request Allocation":
                 try:
                     supabase.auth.sign_up({"email": email, "password": password})
@@ -178,10 +175,9 @@ else:
 
     with st.sidebar:
         st.markdown("### ⎈ ACCESS CONTROL")
-        st.markdown(f"<div style='background-color: #0f172a; padding: 15px; border-radius: 6px; border-left: 3px solid #38bdf8; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
-        
+        st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 6px; border-left: 3px solid #3b82f6; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
         st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-        if st.button("Terminate Session"):
+        if st.button("🔒 TERMINATE SESSION"):
             supabase.auth.sign_out()
             st.session_state.user_email = None
             st.rerun()
@@ -189,7 +185,7 @@ else:
 
     # --- HOME PAGE (COMMAND CENTER) ---
     if st.session_state.current_view == 'home':
-        st.markdown("<h1><span style='color: #38bdf8;'>⚛</span> COMMAND NODE</h1>", unsafe_allow_html=True)
+        st.markdown("<h1><span style='color: #0ea5e9;'>⚛</span> COMMAND NODE</h1>", unsafe_allow_html=True)
         
         sector_counts = {}
         for t in st.session_state.my_tickers:
@@ -198,20 +194,20 @@ else:
             
         st.markdown("### ◴ SECTOR ALLOCATION MATRIX")
         if sector_counts:
-            custom_colors = ["#38bdf8", "#0ea5e9", "#2563eb", "#1e293b", "#0f172a", "#64748b", "#334155"]
+            custom_colors = ["#0ea5e9", "#38bdf8", "#3b82f6", "#1e293b", "#0f172a", "#64748b", "#334155"]
             fig = px.pie(names=list(sector_counts.keys()), values=list(sector_counts.values()), hole=0.6, color_discrete_sequence=custom_colors)
             fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=20, b=20, l=0, r=0), height=300)
             st.plotly_chart(fig, use_container_width=True)
 
         st.divider()
 
-        st.subheader("⎘ TARGET NEW ASSET")
+        st.subheader("⎘ INJECT NEW ASSET")
         c1, c2 = st.columns([4, 1])
         with c1:
             new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY):", label_visibility="collapsed").strip().upper()
         with c2:
             st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-            if st.button("Append Asset"):
+            if st.button("➕ APPEND"):
                 add_ticker(new_asset)
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -221,20 +217,20 @@ else:
         
         for ticker in st.session_state.my_tickers:
             t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset"})
-            col1, col2, col3, col4 = st.columns([1, 4, 1.5, 1.5])
+            col1, col2, col3, col4 = st.columns([1, 4, 2, 1.5])
             
             with col1: st.markdown(f"**{ticker}**")
             with col2: st.markdown(f"<span style='color: #94a3b8;'>{t_info['name']}</span>", unsafe_allow_html=True)
             
             with col3: 
                 st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-                st.button("Analyze", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
+                st.button("🔍 ANALYZE", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
             with col4: 
                 st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-                st.button("Remove", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
+                st.button("🗑️ DROP", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 0.3em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 0.2em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
 
     # --- DETAIL PAGE ---
     elif st.session_state.current_view == 'detail':
@@ -243,8 +239,11 @@ else:
         title_display = f"{ticker_sym} // {t_info['name']}" if t_info['name'] else ticker_sym
         
         c1, c2 = st.columns([4, 1])
-        with c1: st.markdown(f"<h1><span style='color: #38bdf8;'>⚛</span> {title_display}</h1>", unsafe_allow_html=True)
-        with c2: st.button("Return to Command", on_click=go_to_home, use_container_width=True)
+        with c1: st.markdown(f"<h1><span style='color: #0ea5e9;'>⚛</span> {title_display}</h1>", unsafe_allow_html=True)
+        with c2: 
+            st.markdown('<div class="action-btn">', unsafe_allow_html=True)
+            st.button("⬅ RETURN", on_click=go_to_home, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
         
         with st.spinner(f"Establishing secure telemetry for {ticker_sym}..."):
             df = get_cached_history(ticker_sym)
@@ -269,7 +268,7 @@ else:
                 col1, col2 = st.columns([2, 1])
                 with col1: 
                     st.markdown("**Price Action Trend**")
-                    st.line_chart(df['Close'], color="#38bdf8")
+                    st.line_chart(df['Close'], color="#0ea5e9")
                 with col2: 
                     st.markdown("**Institutional Volume**")
                     st.bar_chart(df['Volume'], color="#1e293b")
