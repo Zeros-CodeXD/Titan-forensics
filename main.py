@@ -6,7 +6,7 @@ from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V1", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
@@ -35,7 +35,7 @@ def init_connection():
     return create_client(url, key)
 
 supabase = init_connection()
-cookie_controller = CookieController() # Initialize the Browser Cookie Manager
+cookie_controller = CookieController()
 
 # --- 3. DATA DICTIONARIES ---
 TICKER_DATA = {
@@ -72,7 +72,6 @@ if 'current_view' not in st.session_state: st.session_state.current_view = 'home
 if 'active_ticker' not in st.session_state: st.session_state.active_ticker = None
 if 'my_tickers' not in st.session_state: st.session_state.my_tickers = DEFAULT_TICKERS.copy()
 
-# Automatically check for existing browser cookies on boot
 saved_cookie = cookie_controller.get("titan_session")
 
 if 'user_email' not in st.session_state: 
@@ -81,7 +80,7 @@ if 'user_email' not in st.session_state:
     else:
         st.session_state.user_email = None
 
-# --- 5. SECURE DATABASE & CACHING LOGIC ---
+# --- 5. SECURE DATABASE, METADATA & CACHING LOGIC ---
 def load_user_data():
     if st.session_state.user_email:
         response = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
@@ -103,7 +102,22 @@ def get_cached_history(ticker_sym):
     except Exception:
         return pd.DataFrame()
 
-# If the app just booted up from a cookie, make sure we pull their specific data
+# NEW: Dynamically scrapes company data for custom tickers
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_dynamic_info(ticker_sym):
+    try:
+        stock = yf.Ticker(ticker_sym)
+        info = stock.info
+        name = info.get("shortName", ticker_sym)
+        website = info.get("website", "")
+        domain = ""
+        if website:
+            # Clean the URL to extract just the base domain
+            domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
+        return name, domain
+    except Exception:
+        return ticker_sym, ""
+
 if st.session_state.user_email and st.session_state.my_tickers == DEFAULT_TICKERS:
     load_user_data()
 
@@ -130,11 +144,8 @@ if st.session_state.user_email is None:
             elif auth_mode == "Authenticate":
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    # 1. Update session
                     st.session_state.user_email = res.user.email
-                    # 2. Write the cookie to the browser so they never have to log in again
                     cookie_controller.set("titan_session", res.user.email)
-                    # 3. Pull their data
                     load_user_data() 
                     st.rerun() 
                 except Exception as e:
@@ -166,11 +177,8 @@ else:
         st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 6px; border-left: 3px solid #3b82f6; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
         st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
         if st.button("🔒 TERMINATE SESSION"):
-            # 1. Sign out of database
             supabase.auth.sign_out()
-            # 2. Delete the browser cookie
             cookie_controller.remove("titan_session")
-            # 3. Wipe memory
             st.session_state.user_email = None
             st.session_state.my_tickers = DEFAULT_TICKERS.copy()
             st.rerun()
@@ -178,14 +186,13 @@ else:
 
     # --- HOME PAGE (COMMAND CENTER) ---
     if st.session_state.current_view == 'home':
-        
         st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS TERMINAL</h3></div>", unsafe_allow_html=True)
         st.divider()
 
         st.subheader("⎘ INJECT NEW ASSET")
         c1, c2 = st.columns([4, 1])
         with c1:
-            new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY):", label_visibility="collapsed").strip().upper()
+            new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY, RELIANCE.NS):", label_visibility="collapsed").strip().upper()
         with c2:
             st.markdown('<div class="add-btn">', unsafe_allow_html=True)
             if st.button("➕ ADD TO INDEX"):
@@ -197,10 +204,15 @@ else:
         st.subheader(f"≣ ACTIVE WATCHLIST ({len(st.session_state.my_tickers)}/50)")
         
         for ticker in st.session_state.my_tickers:
-            t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset", "domain": ""})
-            domain = t_info.get("domain", "")
+            # If it's a default ticker, use the fast dictionary. If custom, scrape dynamically.
+            if ticker in TICKER_DATA:
+                t_name = TICKER_DATA[ticker]["name"]
+                t_domain = TICKER_DATA[ticker]["domain"]
+            else:
+                t_name, t_domain = get_dynamic_info(ticker)
+            
             fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9&bold=true"
-            logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else fallback_url
+            logo_url = f"https://www.google.com/s2/favicons?domain={t_domain}&sz=128" if t_domain else fallback_url
             
             col1, col2, col3, col4 = st.columns([1.5, 3.5, 2, 1.5])
             
@@ -213,7 +225,7 @@ else:
                 """, unsafe_allow_html=True)
                 
             with col2: 
-                st.markdown(f"<div style='color: #94a3b8; padding-top: 8px;'>{t_info['name']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='color: #94a3b8; padding-top: 8px;'>{t_name}</div>", unsafe_allow_html=True)
             
             with col3: 
                 st.markdown('<div class="action-btn">', unsafe_allow_html=True)
@@ -228,17 +240,22 @@ else:
     # --- DETAIL PAGE ---
     elif st.session_state.current_view == 'detail':
         ticker_sym = st.session_state.active_ticker
-        t_info = TICKER_DATA.get(ticker_sym, {"name": "", "domain": ""})
-        domain = t_info.get("domain", "")
+        
+        if ticker_sym in TICKER_DATA:
+            t_name = TICKER_DATA[ticker_sym]["name"]
+            t_domain = TICKER_DATA[ticker_sym]["domain"]
+        else:
+            t_name, t_domain = get_dynamic_info(ticker_sym)
+            
         fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9&bold=true"
-        logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else fallback_url
+        logo_url = f"https://www.google.com/s2/favicons?domain={t_domain}&sz=128" if t_domain else fallback_url
         
         c1, c2 = st.columns([4, 1])
         with c1: 
             st.markdown(f"""
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="40" height="40" style="border-radius: 8px; object-fit: contain; background-color: #ffffff; padding: 2px;">
-                    <h1 style="margin: 0;"><span style='color: #0ea5e9;'>⚛</span> {ticker_sym} <span style="font-size: 0.6em; color: #64748b;">// {t_info['name']}</span></h1>
+                    <h1 style="margin: 0;"><span style='color: #0ea5e9;'>⚛</span> {ticker_sym} <span style="font-size: 0.6em; color: #64748b;">// {t_name}</span></h1>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -281,4 +298,4 @@ else:
                 fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0), height=400)
                 st.plotly_chart(fig, use_container_width=True)
         else:
-            st.error(f"ERR_DATA_NULL: Telemetry for {ticker_sym} failed. Asset may be delisted.")
+            st.error(f"ERR_DATA_NULL: Telemetry for {ticker_sym} failed. Ensure the ticker is valid (e.g., use .NS for Indian stocks).")
