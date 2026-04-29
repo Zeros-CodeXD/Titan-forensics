@@ -6,7 +6,7 @@ import plotly.express as px
 from supabase import create_client, Client
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V8", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V9", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
@@ -19,35 +19,33 @@ st.markdown("""
     h1, h2, h3 { color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;}
     div[data-testid="column"] { display: flex; align-items: center; }
     
-    /* Master Button Reset */
-    .stButton>button { 
+    /* Master Button Reset - FORCING DARK TEXT ON ALL BUTTONS */
+    .stButton>button, .stButton>button * { 
         border-radius: 6px; 
         font-weight: 800; 
         width: 100%; 
         transition: all 0.2s ease; 
         border: none !important;
+        color: #0f172a !important; /* This guarantees no white text */
     }
     
-    /* Add Button (Cyan, Dark Text) */
+    /* Add Button (Cyan Background) */
     .add-btn .stButton>button { 
         background: #0ea5e9 !important; 
-        color: #0f172a !important; 
         box-shadow: 0px 4px 10px rgba(14, 165, 233, 0.3);
     }
     .add-btn .stButton>button:hover { background: #38bdf8 !important; transform: translateY(-2px); }
     
-    /* Execute/View Button (Blue, Dark Text) */
+    /* Execute/Analyze Button (Blue Background) */
     .action-btn .stButton>button {
         background: #3b82f6 !important; 
-        color: #0f172a !important; 
         box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.3);
     }
     .action-btn .stButton>button:hover { background: #60a5fa !important; transform: scale(1.02); }
     
-    /* Remove Button (Soft Red, Dark Text) */
+    /* Remove Button (Red Background) */
     .remove-btn .stButton>button {
         background: #f87171 !important; 
-        color: #0f172a !important; 
         box-shadow: 0px 4px 10px rgba(248, 113, 113, 0.2);
     }
     .remove-btn .stButton>button:hover { background: #fca5a5 !important; transform: scale(1.02); }
@@ -136,7 +134,7 @@ if st.session_state.user_email is None:
         password = st.text_input("Encryption Key (Password)", type="password")
         
         st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-        if st.button("⚡ INITIATE HANDSHAKE"):
+        if st.button("🔐 INITIATE HANDSHAKE"):
             if auth_mode == "Request Allocation":
                 try:
                     supabase.auth.sign_up({"email": email, "password": password})
@@ -207,7 +205,7 @@ else:
             new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY):", label_visibility="collapsed").strip().upper()
         with c2:
             st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-            if st.button("➕ APPEND"):
+            if st.button("➕ ADD TO INDEX"):
                 add_ticker(new_asset)
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -228,7 +226,7 @@ else:
                 st.markdown('</div>', unsafe_allow_html=True)
             with col4: 
                 st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-                st.button("🗑️ DROP", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
+                st.button("❌ REMOVE", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
             st.markdown("<hr style='margin: 0.2em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
 
