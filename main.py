@@ -6,7 +6,7 @@ import plotly.express as px
 from supabase import create_client, Client
 
 # --- 1. SETTINGS & HIGH-END CSS ---
-st.set_page_config(page_title="Titan V7", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V7.1", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
@@ -100,7 +100,7 @@ if 'current_view' not in st.session_state: st.session_state.current_view = 'home
 if 'active_ticker' not in st.session_state: st.session_state.active_ticker = None
 if 'my_tickers' not in st.session_state: st.session_state.my_tickers = DEFAULT_TICKERS.copy()
 
-# --- 5. DATABASE LOGIC ---
+# --- 5. SECURE DATABASE & CACHING LOGIC ---
 def load_user_data():
     if st.session_state.user_email:
         response = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
@@ -113,6 +113,15 @@ def load_user_data():
 def save_user_data():
     if st.session_state.user_email:
         supabase.table("secure_watchlists").upsert({"email": st.session_state.user_email, "tickers": st.session_state.my_tickers}).execute()
+
+# Protects IP from Yahoo Rate Limits
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_cached_history(ticker_sym):
+    try:
+        stock = yf.Ticker(ticker_sym)
+        return stock.history(period="3mo")
+    except Exception:
+        return pd.DataFrame()
 
 # --- 6. AUTHENTICATION GATEWAY ---
 if st.session_state.user_email is None:
@@ -175,7 +184,7 @@ else:
     if st.session_state.current_view == 'home':
         st.markdown("<h1><span style='color: #06b6d4;'>⚛</span> COMMAND NODE</h1>", unsafe_allow_html=True)
         
-        # New Sector Analytics Matrix
+        # Sector Analytics Matrix with Fixed Plotly Colors
         sector_counts = {}
         for t in st.session_state.my_tickers:
             sec = TICKER_DATA.get(t, {}).get("sector", "Custom / Unclassified")
@@ -183,7 +192,8 @@ else:
             
         st.markdown("### ◴ SECTOR ALLOCATION MATRIX")
         if sector_counts:
-            fig = px.pie(names=list(sector_counts.keys()), values=list(sector_counts.values()), hole=0.6, color_discrete_sequence=px.colors.sequential.Cyan)
+            custom_colors = ["#06b6d4", "#0ea5e9", "#3b82f6", "#1e293b", "#0f172a", "#64748b", "#334155"]
+            fig = px.pie(names=list(sector_counts.keys()), values=list(sector_counts.values()), hole=0.6, color_discrete_sequence=custom_colors)
             fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=20, b=20, l=0, r=0), height=300)
             st.plotly_chart(fig, use_container_width=True)
 
@@ -231,8 +241,7 @@ else:
         with c2: st.button("[<] RETURN", on_click=go_to_home, use_container_width=True)
         
         with st.spinner(f"Establishing secure telemetry for {ticker_sym}..."):
-            stock = yf.Ticker(ticker_sym)
-            df = stock.history(period="3mo")
+            df = get_cached_history(ticker_sym)
             
         if not df.empty:
             latest_close = df['Close'].iloc[-1]
