@@ -36,3 +36,24 @@ To run this terminal locally:
    ```bash
    git clone [https://github.com/YOUR_USERNAME/titan-forensics.git](https://github.com/YOUR_USERNAME/titan-forensics.git)
    cd titan-forensics
+
+2. **Install Dependencies:**
+pip install -r requirements.txt
+
+3. **Configure Secrets:**
+Create a .streamlit/secrets.toml file and add your Supabase credentials:
+SUPABASE_URL = "your_supabase_url"
+SUPABASE_KEY = "your_supabase_anon_key"
+
+4. **Run the App:**
+streamlit run main.py
+
+## 🏗 SYSTEM EVOLUTION
+V1-V5: Initial UI prototyping and logic testing.
+
+V6-V10: Migration to Supabase and implementation of encrypted Auth.
+
+V11-V13: Visual overhaul, logo telemetry integration, and persistent browser sessions.
+
+## ⚖️ DISCLAIMER 
+This tool is for educational and forensic analysis purposes only. All financial data is retrieved from public sources and may be delayed. Use for active trading at your own risk.
