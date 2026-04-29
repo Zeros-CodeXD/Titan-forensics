@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
-import plotly.express as px
 from supabase import create_client, Client
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V9", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V10", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
@@ -51,6 +50,23 @@ st.markdown("""
     .remove-btn .stButton>button:hover { background: #fca5a5 !important; transform: scale(1.02); }
     
     .auth-box { background: #0f172a; padding: 2rem; border-radius: 8px; border: 1px solid #1e293b; border-left: 4px solid #3b82f6; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
+    
+    /* Massive Hero Header */
+    .hero-title {
+        text-align: center;
+        padding: 3rem 0 1rem 0;
+    }
+    .hero-title h1 {
+        font-size: 4.5rem;
+        margin-bottom: 0;
+        text-shadow: 0px 0px 20px rgba(14, 165, 233, 0.4);
+    }
+    .hero-title h3 {
+        color: #64748b;
+        margin-top: 0;
+        letter-spacing: 5px;
+        font-size: 1.2rem;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -123,7 +139,7 @@ def get_cached_history(ticker_sym):
 
 # --- 6. AUTHENTICATION GATEWAY ---
 if st.session_state.user_email is None:
-    st.markdown("<h1 style='text-align: center;'><span style='font-size: 1.2em; color: #0ea5e9;'>⚛</span> TITAN FORENSICS</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS</h3></div>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Institutional Terminal • Authorized Personnel Only</p><br>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -183,20 +199,9 @@ else:
 
     # --- HOME PAGE (COMMAND CENTER) ---
     if st.session_state.current_view == 'home':
-        st.markdown("<h1><span style='color: #0ea5e9;'>⚛</span> COMMAND NODE</h1>", unsafe_allow_html=True)
         
-        sector_counts = {}
-        for t in st.session_state.my_tickers:
-            sec = TICKER_DATA.get(t, {}).get("sector", "Custom / Unclassified")
-            sector_counts[sec] = sector_counts.get(sec, 0) + 1
-            
-        st.markdown("### ◴ SECTOR ALLOCATION MATRIX")
-        if sector_counts:
-            custom_colors = ["#0ea5e9", "#38bdf8", "#3b82f6", "#1e293b", "#0f172a", "#64748b", "#334155"]
-            fig = px.pie(names=list(sector_counts.keys()), values=list(sector_counts.values()), hole=0.6, color_discrete_sequence=custom_colors)
-            fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=20, b=20, l=0, r=0), height=300)
-            st.plotly_chart(fig, use_container_width=True)
-
+        # Massive Hero Header Replaces Pie Chart
+        st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS TERMINAL</h3></div>", unsafe_allow_html=True)
         st.divider()
 
         st.subheader("⎘ INJECT NEW ASSET")
