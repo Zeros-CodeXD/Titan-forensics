@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 
 # --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan", page_icon="⚛", layout="wide")
+st.set_page_config(page_title="Titan V11.1", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
@@ -220,17 +220,19 @@ else:
         for ticker in st.session_state.my_tickers:
             t_info = TICKER_DATA.get(ticker, {"name": "Custom Asset", "domain": ""})
             
-            # --- LOGO FETCHING LOGIC ---
+            # --- BULLETPROOF GOOGLE FAVICON & FALLBACK LOGIC ---
             domain = t_info.get("domain", "")
-            # Fetches logo if domain exists, otherwise creates a fallback avatar
-            logo_url = f"https://logo.clearbit.com/{domain}" if domain else f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9"
+            fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9&bold=true"
+            # Using Google's S2 Favicon API which won't block Streamlit
+            logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else fallback_url
             
             col1, col2, col3, col4 = st.columns([1.5, 3.5, 2, 1.5])
             
             with col1: 
+                # Notice the 'onerror' JS attribute - if Google fails, it auto-swaps to the UI Avatar!
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">
-                        <img src="{logo_url}" width="30" height="30" style="border-radius: 6px; object-fit: contain; background-color: #ffffff; padding: 2px;">
+                        <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="30" height="30" style="border-radius: 6px; object-fit: contain; background-color: #ffffff; padding: 2px;">
                         <span style="font-weight: bold; font-size: 1.1em;">{ticker}</span>
                     </div>
                 """, unsafe_allow_html=True)
@@ -253,14 +255,16 @@ else:
         ticker_sym = st.session_state.active_ticker
         t_info = TICKER_DATA.get(ticker_sym, {"name": "", "domain": ""})
         
+        # --- BULLETPROOF GOOGLE FAVICON & FALLBACK LOGIC ---
         domain = t_info.get("domain", "")
-        logo_url = f"https://logo.clearbit.com/{domain}" if domain else f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9"
+        fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9&bold=true"
+        logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128" if domain else fallback_url
         
         c1, c2 = st.columns([4, 1])
         with c1: 
             st.markdown(f"""
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <img src="{logo_url}" width="40" height="40" style="border-radius: 8px; object-fit: contain; background-color: #ffffff; padding: 2px;">
+                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="40" height="40" style="border-radius: 8px; object-fit: contain; background-color: #ffffff; padding: 2px;">
                     <h1 style="margin: 0;"><span style='color: #0ea5e9;'>⚛</span> {ticker_sym} <span style="font-size: 0.6em; color: #64748b;">// {t_info['name']}</span></h1>
                 </div>
             """, unsafe_allow_html=True)
