@@ -38,14 +38,17 @@ To run this terminal locally:
    cd titan-forensics
 
 2. **Install Dependencies:**
+```bash
 pip install -r requirements.txt
 
 3. **Configure Secrets:**
 Create a .streamlit/secrets.toml file and add your Supabase credentials:
+```bash
 SUPABASE_URL = "your_supabase_url"
 SUPABASE_KEY = "your_supabase_anon_key"
 
 4. **Run the App:**
+```bash
 streamlit run main.py
 
 ## 🏗 SYSTEM EVOLUTION
