@@ -287,19 +287,18 @@ else:
             else:
                 t_name, t_domain = get_dynamic_info(ticker)
             
-            # Using Clearbit for crisp logos, UI-Avatars for fallback. NO WHITE BACKGROUNDS.
+            # Using Icon.horse which is highly reliable and handles its own fallbacks automatically
             fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=00e5ff&bold=true&font-size=0.33"
-            logo_url = f"https://logo.clearbit.com/{t_domain}" if t_domain else fallback_url
+            logo_url = f"https://icon.horse/icon/{t_domain}" if t_domain else fallback_url
             
             # Container for the row to maintain alignment
             st.markdown('<div class="ticker-card">', unsafe_allow_html=True)
             col1, col2, col3, col4 = st.columns([0.5, 3, 1, 1])
             
             with col1: 
-                # Removed the white background from the styling block.
+                # Removed the 'onerror' script since Streamlit blocks inline javascript natively
                 st.markdown(f"""
-                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" 
-                    style="width: 38px; height: 38px; border-radius: 6px; object-fit: contain; background-color: transparent;">
+                    <img src="{logo_url}" style="width: 38px; height: 38px; border-radius: 6px; object-fit: contain; background-color: transparent;">
                 """, unsafe_allow_html=True)
                 
             with col2: 
@@ -323,19 +322,20 @@ else:
         else:
             t_name, t_domain = get_dynamic_info(ticker_sym)
             
+        # Using Icon.horse here as well
         fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=00e5ff&bold=true&font-size=0.33"
-        logo_url = f"https://logo.clearbit.com/{t_domain}" if t_domain else fallback_url
+        logo_url = f"https://icon.horse/icon/{t_domain}" if t_domain else fallback_url
         
         c1, c2 = st.columns([5, 1])
         with c1: 
             st.markdown(f"""
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" style="width: 50px; height: 50px; border-radius: 8px; object-fit: contain; background-color: transparent;">
+                    <img src="{logo_url}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: contain; background-color: transparent;">
                     <h1 style="margin: 0;">{ticker_sym} <span style="font-size: 0.5em; color: #64748b !important;">// {t_name}</span></h1>
                 </div>
             """, unsafe_allow_html=True)
             
-        with col2: 
+        with c2: 
             st.button("⬅ RETURN TO INDEX", on_click=go_to_home, use_container_width=True)
         
         st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
