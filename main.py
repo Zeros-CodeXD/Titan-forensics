@@ -5,25 +5,92 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
 
-# --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V1", page_icon="⚛", layout="wide")
+# --- 1. SETTINGS & STRICT NON-WHITE TERMINAL CSS ---
+st.set_page_config(page_title="Titan Terminal", page_icon="⚛", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background: radial-gradient(circle at top, #0f172a 0%, #020617 100%); background-size: cover; color: #e2e8f0; }
-    h1, h2, h3 { color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;}
-    div[data-testid="column"] { display: flex; align-items: center; }
-    .stButton>button, .stButton>button * { border-radius: 6px; font-weight: 800; width: 100%; transition: all 0.2s ease; border: none !important; color: #0f172a !important; }
-    .add-btn .stButton>button { background: #0ea5e9 !important; box-shadow: 0px 4px 10px rgba(14, 165, 233, 0.3); }
-    .add-btn .stButton>button:hover { background: #38bdf8 !important; transform: translateY(-2px); }
-    .action-btn .stButton>button { background: #3b82f6 !important; box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.3); }
-    .action-btn .stButton>button:hover { background: #60a5fa !important; transform: scale(1.02); }
-    .remove-btn .stButton>button { background: #f87171 !important; box-shadow: 0px 4px 10px rgba(248, 113, 113, 0.2); }
-    .remove-btn .stButton>button:hover { background: #fca5a5 !important; transform: scale(1.02); }
-    .auth-box { background: #0f172a; padding: 2rem; border-radius: 8px; border: 1px solid #1e293b; border-left: 4px solid #3b82f6; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
-    .hero-title { text-align: center; padding: 3rem 0 1rem 0; }
-    .hero-title h1 { font-size: 4.5rem; margin-bottom: 0; text-shadow: 0px 0px 20px rgba(14, 165, 233, 0.4); }
-    .hero-title h3 { color: #64748b; margin-top: 0; letter-spacing: 5px; font-size: 1.2rem; }
+    /* Global App Background - Deep Obsidian/Navy */
+    .stApp { 
+        background: radial-gradient(circle at top, #080d17 0%, #03070b 100%); 
+        background-size: cover; 
+    }
+    
+    /* ENFORCING NO-WHITE RULE FOR ALL TEXT & FEATURES */
+    p, span, div, label, li { color: #94a3b8 !important; }
+    h1, h2, h3, h4, h5, h6 { 
+        color: #00e5ff !important; 
+        font-family: 'Courier New', Courier, monospace; 
+        letter-spacing: 2px;
+        text-shadow: 0px 0px 8px rgba(0, 229, 255, 0.3);
+    }
+    
+    /* Inputs & Selectors */
+    .stTextInput>div>div>input { 
+        background-color: #0f172a !important; 
+        color: #00e5ff !important; 
+        border: 1px solid #1e293b !important; 
+    }
+    .stTextInput>div>div>input:focus {
+        border-color: #00e5ff !important;
+        box-shadow: 0 0 8px rgba(0, 229, 255, 0.4) !important;
+    }
+    .stRadio label, .stCheckbox label { color: #00e5ff !important; }
+
+    /* Universal Button Styling (No White) */
+    .stButton>button { 
+        border-radius: 4px; 
+        font-weight: 800; 
+        letter-spacing: 1px;
+        width: 100%; 
+        transition: all 0.3s ease; 
+        background: #0f172a !important; 
+        color: #00e5ff !important;
+        border: 1px solid #00e5ff !important; 
+    }
+    .stButton>button:hover { 
+        background: #00e5ff !important; 
+        color: #03070b !important; 
+        box-shadow: 0px 0px 15px rgba(0, 229, 255, 0.5); 
+        transform: translateY(-2px);
+    }
+    
+    /* Specific Action Buttons */
+    .add-btn .stButton>button { border-color: #00fa9a !important; color: #00fa9a !important; }
+    .add-btn .stButton>button:hover { background: #00fa9a !important; color: #03070b !important; box-shadow: 0px 0px 15px rgba(0, 250, 154, 0.5); }
+    
+    .remove-btn .stButton>button { border-color: #ff2a6d !important; color: #ff2a6d !important; }
+    .remove-btn .stButton>button:hover { background: #ff2a6d !important; color: #03070b !important; box-shadow: 0px 0px 15px rgba(255, 42, 109, 0.5); }
+
+    /* Better Login UI */
+    .auth-box { 
+        background: rgba(15, 23, 42, 0.6); 
+        backdrop-filter: blur(10px);
+        padding: 3rem; 
+        border-radius: 12px; 
+        border: 1px solid #1e293b; 
+        border-top: 4px solid #00e5ff; 
+        box-shadow: 0px 15px 40px rgba(0, 229, 255, 0.05);
+    }
+    
+    /* Custom Ticker Card UI */
+    .ticker-card {
+        background: #0b1221;
+        border: 1px solid #1e293b;
+        border-left: 4px solid #00e5ff;
+        border-radius: 6px;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        transition: all 0.2s ease;
+    }
+    .ticker-card:hover {
+        border-color: #00e5ff;
+        background: #0f1a2e;
+    }
+
+    /* Metric UI */
+    div[data-testid="stMetricValue"] > div { color: #00fa9a !important; font-family: monospace; font-size: 1.8rem; }
+    div[data-testid="stMetricDelta"] > div { color: #00e5ff !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -80,7 +147,7 @@ if 'user_email' not in st.session_state:
     else:
         st.session_state.user_email = None
 
-# --- 5. SECURE DATABASE, METADATA & CACHING LOGIC ---
+# --- 5. SECURE DATABASE & METADATA LOGIC ---
 def load_user_data():
     if st.session_state.user_email:
         response = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
@@ -102,7 +169,6 @@ def get_cached_history(ticker_sym):
     except Exception:
         return pd.DataFrame()
 
-# NEW: Dynamically scrapes company data for custom tickers
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_dynamic_info(ticker_sym):
     try:
@@ -112,7 +178,6 @@ def get_dynamic_info(ticker_sym):
         website = info.get("website", "")
         domain = ""
         if website:
-            # Clean the URL to extract just the base domain
             domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
         return name, domain
     except Exception:
@@ -123,25 +188,29 @@ if st.session_state.user_email and st.session_state.my_tickers == DEFAULT_TICKER
 
 # --- 6. AUTHENTICATION GATEWAY ---
 if st.session_state.user_email is None:
-    st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS</h3></div>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Institutional Terminal • Authorized Personnel Only</p><br>", unsafe_allow_html=True)
+    st.write("")
+    st.write("")
+    st.markdown("<h1 style='text-align: center; font-size: 5rem;'><span style='color: #00e5ff;'>⚛</span> TITAN</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #64748b !important; letter-spacing: 5px;'>SYSTEM ACCESS GATEWAY</h3>", unsafe_allow_html=True)
+    st.write("")
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         st.markdown('<div class="auth-box">', unsafe_allow_html=True)
-        auth_mode = st.radio("System Access:", ["Authenticate", "Request Allocation"], horizontal=True)
-        email = st.text_input("Operator ID (Email)")
-        password = st.text_input("Encryption Key (Password)", type="password")
+        auth_mode = st.radio("SELECT MODE:", ["AUTHENTICATE", "REQUEST ALLOCATION"], horizontal=True)
+        st.write("")
+        email = st.text_input("OPERATOR ID (EMAIL)")
+        password = st.text_input("ENCRYPTION KEY (PASSWORD)", type="password")
+        st.write("")
         
-        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-        if st.button("🔐 INITIATE HANDSHAKE"):
-            if auth_mode == "Request Allocation":
+        if st.button("🔐 INITIATE SECURE HANDSHAKE"):
+            if auth_mode == "REQUEST ALLOCATION":
                 try:
                     supabase.auth.sign_up({"email": email, "password": password})
-                    st.success("Credentials logged. Proceed to authenticate.")
+                    st.success("CREDENTIALS LOGGED. PROCEED TO AUTHENTICATE.", icon="✅")
                 except Exception as e:
-                    st.error(f"Registration Error: {e}")
-            elif auth_mode == "Authenticate":
+                    st.error(f"REGISTRATION ERR: {e}")
+            elif auth_mode == "AUTHENTICATE":
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                     st.session_state.user_email = res.user.email
@@ -149,7 +218,7 @@ if st.session_state.user_email is None:
                     load_user_data() 
                     st.rerun() 
                 except Exception as e:
-                    st.error("ERR_CONNECTION_REFUSED: Invalid credentials.")
+                    st.error("ERR_CONNECTION_REFUSED: INVALID CREDENTIALS.", icon="❌")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 7. THE TERMINAL ---
@@ -170,13 +239,20 @@ else:
                 st.session_state.my_tickers.insert(0, new_ticker)
                 save_user_data()
             else:
-                st.error("ERR_MEMORY_FULL: Max 50 assets permitted.")
+                st.error("ERR_MEMORY_FULL: MAX 50 ASSETS PERMITTED.")
 
+    # --- BETTER LOGOUT & SIDEBAR ---
     with st.sidebar:
-        st.markdown("### ⎈ ACCESS CONTROL")
-        st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 6px; border-left: 3px solid #3b82f6; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
+        st.markdown("## ⎈ CONTROL PANEL")
+        st.markdown(f"""
+            <div style='background-color: #0b1221; padding: 15px; border-radius: 6px; border: 1px solid #1e293b; border-left: 4px solid #00fa9a;'>
+                <p style='color: #00fa9a !important; font-size: 0.8rem; margin:0;'>STATUS: SECURE LINK ACTIVE</p>
+                <p style='color: #00e5ff !important; font-family: monospace; margin: 10px 0 0 0; font-size: 1.1rem; word-wrap: break-word;'>{st.session_state.user_email}</p>
+            </div><br>
+        """, unsafe_allow_html=True)
+        
         st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-        if st.button("🔒 TERMINATE SESSION"):
+        if st.button("🔌 SEVER CONNECTION (LOGOUT)"):
             supabase.auth.sign_out()
             cookie_controller.remove("titan_session")
             st.session_state.user_email = None
@@ -186,56 +262,56 @@ else:
 
     # --- HOME PAGE (COMMAND CENTER) ---
     if st.session_state.current_view == 'home':
-        st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS TERMINAL</h3></div>", unsafe_allow_html=True)
-        st.divider()
+        st.markdown("<h1><span style='color: #00e5ff;'>⚛</span> TITAN TERMINAL // MACRO-FORENSICS</h1>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
 
-        st.subheader("⎘ INJECT NEW ASSET")
-        c1, c2 = st.columns([4, 1])
+        st.markdown("### ⎘ INJECT NEW ASSET SYMBOLOGY")
+        c1, c2 = st.columns([5, 1])
         with c1:
-            new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY, RELIANCE.NS):", label_visibility="collapsed").strip().upper()
+            new_asset = st.text_input("TICKER INPUT", placeholder="e.g., PLTR, SPY, RELIANCE.NS", label_visibility="collapsed").strip().upper()
         with c2:
             st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-            if st.button("➕ ADD TO INDEX"):
+            if st.button("➕ ADD ASSET"):
                 add_ticker(new_asset)
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.write("")
-        st.subheader(f"≣ ACTIVE WATCHLIST ({len(st.session_state.my_tickers)}/50)")
+        st.markdown(f"### ≣ ACTIVE INDEX ALLOCATION ({len(st.session_state.my_tickers)}/50)")
         
+        # Grid layout for tickers
         for ticker in st.session_state.my_tickers:
-            # If it's a default ticker, use the fast dictionary. If custom, scrape dynamically.
             if ticker in TICKER_DATA:
                 t_name = TICKER_DATA[ticker]["name"]
                 t_domain = TICKER_DATA[ticker]["domain"]
             else:
                 t_name, t_domain = get_dynamic_info(ticker)
             
-            fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9&bold=true"
-            logo_url = f"https://www.google.com/s2/favicons?domain={t_domain}&sz=128" if t_domain else fallback_url
+            # Using Clearbit for crisp logos, UI-Avatars for fallback. NO WHITE BACKGROUNDS.
+            fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=00e5ff&bold=true&font-size=0.33"
+            logo_url = f"https://logo.clearbit.com/{t_domain}" if t_domain else fallback_url
             
-            col1, col2, col3, col4 = st.columns([1.5, 3.5, 2, 1.5])
+            # Container for the row to maintain alignment
+            st.markdown('<div class="ticker-card">', unsafe_allow_html=True)
+            col1, col2, col3, col4 = st.columns([0.5, 3, 1, 1])
             
             with col1: 
+                # Removed the white background from the styling block.
                 st.markdown(f"""
-                    <div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">
-                        <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="30" height="30" style="border-radius: 6px; object-fit: contain; background-color: #ffffff; padding: 2px;">
-                        <span style="font-weight: bold; font-size: 1.1em;">{ticker}</span>
-                    </div>
+                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" 
+                    style="width: 38px; height: 38px; border-radius: 6px; object-fit: contain; background-color: transparent;">
                 """, unsafe_allow_html=True)
                 
             with col2: 
-                st.markdown(f"<div style='color: #94a3b8; padding-top: 8px;'>{t_name}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top: 5px;'><span style='font-size: 1.2rem; font-weight: bold; color: #00e5ff !important;'>{ticker}</span> <span style='color: #64748b !important;'>// {t_name}</span></div>", unsafe_allow_html=True)
             
             with col3: 
-                st.markdown('<div class="action-btn">', unsafe_allow_html=True)
                 st.button("🔍 ANALYZE", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
-                st.markdown('</div>', unsafe_allow_html=True)
             with col4: 
                 st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-                st.button("❌ REMOVE", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
+                st.button("❌ PURGE", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 0.2em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # --- DETAIL PAGE ---
     elif st.session_state.current_view == 'detail':
@@ -247,25 +323,24 @@ else:
         else:
             t_name, t_domain = get_dynamic_info(ticker_sym)
             
-        fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9&bold=true"
-        logo_url = f"https://www.google.com/s2/favicons?domain={t_domain}&sz=128" if t_domain else fallback_url
+        fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=00e5ff&bold=true&font-size=0.33"
+        logo_url = f"https://logo.clearbit.com/{t_domain}" if t_domain else fallback_url
         
-        c1, c2 = st.columns([4, 1])
+        c1, c2 = st.columns([5, 1])
         with c1: 
             st.markdown(f"""
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="40" height="40" style="border-radius: 8px; object-fit: contain; background-color: #ffffff; padding: 2px;">
-                    <h1 style="margin: 0;"><span style='color: #0ea5e9;'>⚛</span> {ticker_sym} <span style="font-size: 0.6em; color: #64748b;">// {t_name}</span></h1>
+                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" style="width: 50px; height: 50px; border-radius: 8px; object-fit: contain; background-color: transparent;">
+                    <h1 style="margin: 0;">{ticker_sym} <span style="font-size: 0.5em; color: #64748b !important;">// {t_name}</span></h1>
                 </div>
             """, unsafe_allow_html=True)
             
-        with c2: 
-            st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-            st.button("⬅ RETURN", on_click=go_to_home, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        with col2: 
+            st.button("⬅ RETURN TO INDEX", on_click=go_to_home, use_container_width=True)
         
-        st.write("")
-        with st.spinner(f"Establishing secure telemetry for {ticker_sym}..."):
+        st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
+        
+        with st.spinner(f"ESTABLISHING SECURE TELEMETRY FOR {ticker_sym}..."):
             df = get_cached_history(ticker_sym)
             
         if not df.empty:
@@ -274,28 +349,45 @@ else:
             latest_vol = df['Volume'].iloc[-1]
             price_delta = latest_close - df['Close'].iloc[-2]
             
-            st.write("---")
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Latest Close", f"${latest_close:,.2f}", f"${price_delta:,.2f}")
-            m2.metric("Latest Open", f"${latest_open:,.2f}")
-            m3.metric("Daily Trade Volume", f"{latest_vol:,.0f}")
-            m4.metric("Telemetry Window", "90 Days")
-            st.write("---")
+            m1.metric("LATEST CLOSE", f"${latest_close:,.2f}", f"{price_delta:,.2f}")
+            m2.metric("LATEST OPEN", f"${latest_open:,.2f}")
+            m3.metric("TRADE VOLUME", f"{latest_vol:,.0f}")
+            m4.metric("TELEMETRY WINDOW", "90 DAYS")
+            st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
             
-            chart_type = st.radio("Visualization Matrix:", ["Standard Output", "Pro (Candlestick)"], horizontal=True)
+            chart_type = st.radio("VISUALIZATION MATRIX:", ["STANDARD OUTPUT", "PRO (CANDLESTICK)"], horizontal=True)
             
-            if chart_type == "Standard Output":
+            if chart_type == "STANDARD OUTPUT":
                 col1, col2 = st.columns([2, 1])
                 with col1: 
-                    st.markdown("**Price Action Trend**")
-                    st.line_chart(df['Close'], color="#0ea5e9")
+                    st.markdown("### PRICE ACTION TREND")
+                    # Enforcing the specific cyan color on native charts
+                    st.line_chart(df['Close'], color="#00e5ff")
                 with col2: 
-                    st.markdown("**Institutional Volume**")
-                    st.bar_chart(df['Volume'], color="#1e293b")
+                    st.markdown("### INSTITUTIONAL VOLUME")
+                    st.bar_chart(df['Volume'], color="#00fa9a")
             else: 
-                st.markdown("**Candlestick Price Action**")
-                fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
-                fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0), height=400)
+                st.markdown("### CANDLESTICK PRICE ACTION")
+                fig = go.Figure(data=[go.Candlestick(
+                    x=df.index, 
+                    open=df['Open'], 
+                    high=df['High'], 
+                    low=df['Low'], 
+                    close=df['Close'],
+                    increasing_line_color='#00fa9a',  # Emerald for up
+                    decreasing_line_color='#ff2a6d'   # Ruby Red for down
+                )])
+                fig.update_layout(
+                    template="plotly_dark", 
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)', 
+                    margin=dict(l=0, r=0, t=0, b=0), 
+                    height=450,
+                    font=dict(color="#94a3b8") # Ensures chart labels aren't white
+                )
+                fig.update_xaxes(showgrid=False, zeroline=False)
+                fig.update_yaxes(showgrid=True, gridcolor='#1e293b', zeroline=False)
                 st.plotly_chart(fig, use_container_width=True)
         else:
-            st.error(f"ERR_DATA_NULL: Telemetry for {ticker_sym} failed. Ensure the ticker is valid (e.g., use .NS for Indian stocks).")
+            st.error(f"ERR_DATA_NULL: TELEMETRY FOR {ticker_sym} FAILED. VERIFY TICKER ACCURACY.", icon="⚠")
