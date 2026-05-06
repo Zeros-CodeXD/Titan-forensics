@@ -4,6 +4,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
+from datetime import datetime
 
 # --- 1. SETTINGS & STRICT NON-WHITE TERMINAL CSS ---
 st.set_page_config(page_title="Titan Terminal", page_icon="⚛", layout="wide")
@@ -26,7 +27,7 @@ st.markdown("""
     }
     
     /* Inputs & Selectors */
-    .stTextInput>div>div>input { 
+    .stTextInput>div>div>input, .stSelectbox>div>div>div { 
         background-color: #0f172a !important; 
         color: #00e5ff !important; 
         border: 1px solid #1e293b !important; 
@@ -83,14 +84,26 @@ st.markdown("""
         margin-bottom: 10px;
         transition: all 0.2s ease;
     }
-    .ticker-card:hover {
-        border-color: #00e5ff;
-        background: #0f1a2e;
-    }
+    .ticker-card:hover { border-color: #00e5ff; background: #0f1a2e; }
 
     /* Metric UI */
     div[data-testid="stMetricValue"] > div { color: #00fa9a !important; font-family: monospace; font-size: 1.8rem; }
     div[data-testid="stMetricDelta"] > div { color: #00e5ff !important; }
+
+    /* Tab Styling & News Cards */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent !important; gap: 24px; }
+    .stTabs [data-baseweb="tab"] { color: #64748b !important; font-weight: 800; border-bottom: 2px solid transparent; }
+    .stTabs [aria-selected="true"] { color: #00e5ff !important; border-bottom: 2px solid #00e5ff !important; background: transparent !important;}
+    
+    .news-card { background: #0b1221; border-left: 3px solid #00fa9a; padding: 15px; margin-bottom: 15px; border-radius: 4px; border-right: 1px solid #1e293b; border-top: 1px solid #1e293b; border-bottom: 1px solid #1e293b;}
+    .news-card a { color: #00e5ff !important; text-decoration: none; font-size: 1.1rem; font-weight: bold; }
+    .news-card a:hover { text-decoration: underline; text-shadow: 0px 0px 5px rgba(0, 229, 255, 0.5); }
+    .news-date { color: #64748b !important; font-size: 0.8rem; margin-top: 5px; font-family: monospace;}
+    
+    /* Fundamental Key-Value styling */
+    .fund-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #1e293b; }
+    .fund-key { color: #94a3b8 !important; }
+    .fund-val { color: #00fa9a !important; font-family: monospace; font-weight: bold; font-size: 1.1rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -113,24 +126,7 @@ TICKER_DATA = {
     "META": {"name": "Meta Platforms", "domain": "meta.com", "sector": "Communication"},
     "TSLA": {"name": "Tesla", "domain": "tesla.com", "sector": "Consumer Cyclical"},
     "NVDA": {"name": "NVIDIA", "domain": "nvidia.com", "sector": "Technology"},
-    "NFLX": {"name": "Netflix", "domain": "netflix.com", "sector": "Communication"},
-    "AMD": {"name": "Advanced Micro Devices", "domain": "amd.com", "sector": "Technology"},
-    "INTC": {"name": "Intel", "domain": "intel.com", "sector": "Technology"},
-    "BA": {"name": "Boeing", "domain": "boeing.com", "sector": "Industrials"},
-    "DIS": {"name": "Disney", "domain": "thewaltdisneycompany.com", "sector": "Communication"},
-    "V": {"name": "Visa", "domain": "visa.com", "sector": "Financials"},
-    "JPM": {"name": "JPMorgan Chase", "domain": "jpmorganchase.com", "sector": "Financials"},
-    "WMT": {"name": "Walmart", "domain": "walmart.com", "sector": "Consumer Defensive"},
-    "T": {"name": "AT&T", "domain": "att.com", "sector": "Communication"},
-    "XOM": {"name": "Exxon Mobil", "domain": "exxonmobil.com", "sector": "Energy"},
-    "CVX": {"name": "Chevron", "domain": "chevron.com", "sector": "Energy"},
-    "PG": {"name": "Procter & Gamble", "domain": "pg.com", "sector": "Consumer Defensive"},
-    "KO": {"name": "Coca-Cola", "domain": "coca-colacompany.com", "sector": "Consumer Defensive"},
-    "PEP": {"name": "PepsiCo", "domain": "pepsico.com", "sector": "Consumer Defensive"},
-    "CSCO": {"name": "Cisco", "domain": "cisco.com", "sector": "Technology"},
-    "PFE": {"name": "Pfizer", "domain": "pfizer.com", "sector": "Healthcare"},
-    "MRK": {"name": "Merck", "domain": "merck.com", "sector": "Healthcare"},
-    "ABBV": {"name": "AbbVie", "domain": "abbvie.com", "sector": "Healthcare"}
+    "NFLX": {"name": "Netflix", "domain": "netflix.com", "sector": "Communication"}
 }
 DEFAULT_TICKERS = list(TICKER_DATA.keys())
 
@@ -147,7 +143,7 @@ if 'user_email' not in st.session_state:
     else:
         st.session_state.user_email = None
 
-# --- 5. SECURE DATABASE & METADATA LOGIC ---
+# --- 5. SECURE DATABASE & ADVANCED METADATA LOGIC ---
 def load_user_data():
     if st.session_state.user_email:
         response = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
@@ -161,11 +157,16 @@ def save_user_data():
     if st.session_state.user_email:
         supabase.table("secure_watchlists").upsert({"email": st.session_state.user_email, "tickers": st.session_state.my_tickers}).execute()
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_cached_history(ticker_sym):
+@st.cache_data(ttl=900, show_spinner=False) # Cached for 15 mins for pseudo-realtime
+def get_cached_history(ticker_sym, period="3mo"):
     try:
         stock = yf.Ticker(ticker_sym)
-        return stock.history(period="3mo")
+        df = stock.history(period=period)
+        if not df.empty:
+            # Calculate Technical Indicators
+            df['SMA_20'] = df['Close'].rolling(window=20).mean()
+            df['SMA_50'] = df['Close'].rolling(window=50).mean()
+        return df
     except Exception:
         return pd.DataFrame()
 
@@ -175,13 +176,25 @@ def get_dynamic_info(ticker_sym):
         stock = yf.Ticker(ticker_sym)
         info = stock.info
         name = info.get("shortName", ticker_sym)
-        website = info.get("website", "")
-        domain = ""
-        if website:
-            domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
+        domain = info.get("website", "").replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
         return name, domain
     except Exception:
         return ticker_sym, ""
+
+@st.cache_data(ttl=1800, show_spinner=False) # Cache intel for 30 mins
+def get_full_intel(ticker_sym):
+    try:
+        stock = yf.Ticker(ticker_sym)
+        return stock.info, stock.news
+    except Exception:
+        return {}, []
+
+def format_large_number(num):
+    if not isinstance(num, (int, float)) or pd.isna(num): return "N/A"
+    if num >= 1e12: return f"${num/1e12:.2f}T"
+    if num >= 1e9: return f"${num/1e9:.2f}B"
+    if num >= 1e6: return f"${num/1e6:.2f}M"
+    return f"${num:,.2f}"
 
 if st.session_state.user_email and st.session_state.my_tickers == DEFAULT_TICKERS:
     load_user_data()
@@ -241,7 +254,7 @@ else:
             else:
                 st.error("ERR_MEMORY_FULL: MAX 50 ASSETS PERMITTED.")
 
-    # --- BETTER LOGOUT & SIDEBAR ---
+    # --- SIDEBAR CONTROL PANEL ---
     with st.sidebar:
         st.markdown("## ⎈ CONTROL PANEL")
         st.markdown(f"""
@@ -279,31 +292,21 @@ else:
         st.write("")
         st.markdown(f"### ≣ ACTIVE INDEX ALLOCATION ({len(st.session_state.my_tickers)}/50)")
         
-        # Grid layout for tickers
         for ticker in st.session_state.my_tickers:
             if ticker in TICKER_DATA:
-                t_name = TICKER_DATA[ticker]["name"]
-                t_domain = TICKER_DATA[ticker]["domain"]
+                t_name, t_domain = TICKER_DATA[ticker]["name"], TICKER_DATA[ticker]["domain"]
             else:
                 t_name, t_domain = get_dynamic_info(ticker)
             
-            # Using Icon.horse which is highly reliable and handles its own fallbacks automatically
             fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=00e5ff&bold=true&font-size=0.33"
             logo_url = f"https://icon.horse/icon/{t_domain}" if t_domain else fallback_url
             
-            # Container for the row to maintain alignment
             st.markdown('<div class="ticker-card">', unsafe_allow_html=True)
             col1, col2, col3, col4 = st.columns([0.5, 3, 1, 1])
-            
             with col1: 
-                # Removed the 'onerror' script since Streamlit blocks inline javascript natively
-                st.markdown(f"""
-                    <img src="{logo_url}" style="width: 38px; height: 38px; border-radius: 6px; object-fit: contain; background-color: transparent;">
-                """, unsafe_allow_html=True)
-                
+                st.markdown(f"""<img src="{logo_url}" style="width: 38px; height: 38px; border-radius: 6px; object-fit: contain; background-color: transparent;">""", unsafe_allow_html=True)
             with col2: 
                 st.markdown(f"<div style='padding-top: 5px;'><span style='font-size: 1.2rem; font-weight: bold; color: #00e5ff !important;'>{ticker}</span> <span style='color: #64748b !important;'>// {t_name}</span></div>", unsafe_allow_html=True)
-            
             with col3: 
                 st.button("🔍 ANALYZE", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
             with col4: 
@@ -312,17 +315,15 @@ else:
                 st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- DETAIL PAGE ---
+    # --- DETAIL PAGE (ADVANCED MATRIX) ---
     elif st.session_state.current_view == 'detail':
         ticker_sym = st.session_state.active_ticker
         
         if ticker_sym in TICKER_DATA:
-            t_name = TICKER_DATA[ticker_sym]["name"]
-            t_domain = TICKER_DATA[ticker_sym]["domain"]
+            t_name, t_domain = TICKER_DATA[ticker_sym]["name"], TICKER_DATA[ticker_sym]["domain"]
         else:
             t_name, t_domain = get_dynamic_info(ticker_sym)
             
-        # Using Icon.horse here as well
         fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=00e5ff&bold=true&font-size=0.33"
         logo_url = f"https://icon.horse/icon/{t_domain}" if t_domain else fallback_url
         
@@ -334,60 +335,113 @@ else:
                     <h1 style="margin: 0;">{ticker_sym} <span style="font-size: 0.5em; color: #64748b !important;">// {t_name}</span></h1>
                 </div>
             """, unsafe_allow_html=True)
-            
         with c2: 
             st.button("⬅ RETURN TO INDEX", on_click=go_to_home, use_container_width=True)
         
-        st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
-        
-        with st.spinner(f"ESTABLISHING SECURE TELEMETRY FOR {ticker_sym}..."):
-            df = get_cached_history(ticker_sym)
+        st.markdown("<hr style='border-color: #1e293b; margin: 15px 0;'>", unsafe_allow_html=True)
+
+        # Tabbed Layout for Pro Feel
+        tab1, tab2, tab3 = st.tabs(["🎛️ TELEMETRY MATRIX", "📊 FUNDAMENTAL DATA", "📰 LIVE INTELLIGENCE"])
+
+        with st.spinner(f"ESTABLISHING SECURE DATALINK FOR {ticker_sym}..."):
+            info_data, news_data = get_full_intel(ticker_sym)
             
-        if not df.empty:
-            latest_close = df['Close'].iloc[-1]
-            latest_open = df['Open'].iloc[-1]
-            latest_vol = df['Volume'].iloc[-1]
-            price_delta = latest_close - df['Close'].iloc[-2]
+        # --- TAB 1: CHARTING & PRICE ACTION ---
+        with tab1:
+            control_col, spacer = st.columns([2, 5])
+            with control_col:
+                selected_period = st.selectbox("TIMEFRAME WINDOW:", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"], index=1)
             
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("LATEST CLOSE", f"${latest_close:,.2f}", f"{price_delta:,.2f}")
-            m2.metric("LATEST OPEN", f"${latest_open:,.2f}")
-            m3.metric("TRADE VOLUME", f"{latest_vol:,.0f}")
-            m4.metric("TELEMETRY WINDOW", "90 DAYS")
-            st.markdown("<hr style='border-color: #1e293b;'>", unsafe_allow_html=True)
+            df = get_cached_history(ticker_sym, period=selected_period)
             
-            chart_type = st.radio("VISUALIZATION MATRIX:", ["STANDARD OUTPUT", "PRO (CANDLESTICK)"], horizontal=True)
-            
-            if chart_type == "STANDARD OUTPUT":
-                col1, col2 = st.columns([2, 1])
-                with col1: 
-                    st.markdown("### PRICE ACTION TREND")
-                    # Enforcing the specific cyan color on native charts
-                    st.line_chart(df['Close'], color="#00e5ff")
-                with col2: 
-                    st.markdown("### INSTITUTIONAL VOLUME")
-                    st.bar_chart(df['Volume'], color="#00fa9a")
-            else: 
-                st.markdown("### CANDLESTICK PRICE ACTION")
-                fig = go.Figure(data=[go.Candlestick(
-                    x=df.index, 
-                    open=df['Open'], 
-                    high=df['High'], 
-                    low=df['Low'], 
-                    close=df['Close'],
-                    increasing_line_color='#00fa9a',  # Emerald for up
-                    decreasing_line_color='#ff2a6d'   # Ruby Red for down
-                )])
-                fig.update_layout(
-                    template="plotly_dark", 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
-                    margin=dict(l=0, r=0, t=0, b=0), 
-                    height=450,
-                    font=dict(color="#94a3b8") # Ensures chart labels aren't white
-                )
-                fig.update_xaxes(showgrid=False, zeroline=False)
-                fig.update_yaxes(showgrid=True, gridcolor='#1e293b', zeroline=False)
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.error(f"ERR_DATA_NULL: TELEMETRY FOR {ticker_sym} FAILED. VERIFY TICKER ACCURACY.", icon="⚠")
+            if not df.empty:
+                latest_close = df['Close'].iloc[-1]
+                latest_open = df['Open'].iloc[-1]
+                latest_vol = df['Volume'].iloc[-1]
+                price_delta = latest_close - df['Close'].iloc[-2]
+                
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("LATEST CLOSE", f"${latest_close:,.2f}", f"{price_delta:,.2f}")
+                m2.metric("LATEST OPEN", f"${latest_open:,.2f}")
+                m3.metric("TRADE VOLUME", f"{latest_vol:,.0f}")
+                m4.metric("WINDOW RANGE", selected_period.upper())
+                st.write("")
+                
+                chart_type = st.radio("VISUALIZATION MATRIX:", ["PRO (CANDLESTICK + SMA)", "STANDARD OUTPUT"], horizontal=True)
+                
+                if chart_type == "STANDARD OUTPUT":
+                    col1, col2 = st.columns([2, 1])
+                    with col1: 
+                        st.markdown("### PRICE ACTION TREND")
+                        st.line_chart(df['Close'], color="#00e5ff")
+                    with col2: 
+                        st.markdown("### INSTITUTIONAL VOLUME")
+                        st.bar_chart(df['Volume'], color="#00fa9a")
+                else: 
+                    st.markdown("### CANDLESTICK & MOVING AVERAGES")
+                    fig = go.Figure()
+                    
+                    # Candlestick Trace
+                    fig.add_trace(go.Candlestick(
+                        x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+                        increasing_line_color='#00fa9a', decreasing_line_color='#ff2a6d', name="Price"
+                    ))
+                    # Moving Average Traces
+                    if 'SMA_20' in df.columns:
+                        fig.add_trace(go.Scatter(x=df.index, y=df['SMA_20'], line=dict(color='#00e5ff', width=1.5), name='20-Day SMA'))
+                    if 'SMA_50' in df.columns:
+                        fig.add_trace(go.Scatter(x=df.index, y=df['SMA_50'], line=dict(color='#f59e0b', width=1.5), name='50-Day SMA'))
+
+                    fig.update_layout(
+                        template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+                        margin=dict(l=0, r=0, t=30, b=0), height=500, font=dict(color="#94a3b8"),
+                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+                    )
+                    fig.update_xaxes(showgrid=False, zeroline=False)
+                    fig.update_yaxes(showgrid=True, gridcolor='#1e293b', zeroline=False)
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.error(f"ERR_DATA_NULL: TELEMETRY FAILED.", icon="⚠")
+
+        # --- TAB 2: FUNDAMENTALS ---
+        with tab2:
+            st.markdown("### MACRO-ECONOMIC FUNDAMENTALS")
+            if info_data:
+                f1, f2 = st.columns(2)
+                with f1:
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>Market Capitalization</span><span class='fund-val'>{format_large_number(info_data.get('marketCap'))}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>Trailing P/E Ratio</span><span class='fund-val'>{info_data.get('trailingPE', 'N/A')}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>Forward P/E Ratio</span><span class='fund-val'>{info_data.get('forwardPE', 'N/A')}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>Dividend Yield</span><span class='fund-val'>{info_data.get('dividendYield', 0)*100:.2f}%</span></div>", unsafe_allow_html=True)
+                with f2:
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>52 Week High</span><span class='fund-val'>${info_data.get('fiftyTwoWeekHigh', 'N/A')}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>52 Week Low</span><span class='fund-val'>${info_data.get('fiftyTwoWeekLow', 'N/A')}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>Average Volume (10d)</span><span class='fund-val'>{format_large_number(info_data.get('averageVolume10days'))}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='fund-row'><span class='fund-key'>Sector</span><span class='fund-val'>{info_data.get('sector', 'N/A').upper()}</span></div>", unsafe_allow_html=True)
+                
+                st.write("")
+                st.markdown("#### COMPANY PROFILE")
+                st.markdown(f"<p style='color: #94a3b8 !important; line-height: 1.6;'>{info_data.get('longBusinessSummary', 'Profile data unavailable.')}</p>", unsafe_allow_html=True)
+            else:
+                st.warning("FUNDAMENTAL DATA UNAVAILABLE FOR THIS ASSET.")
+
+        # --- TAB 3: NEWS FEED ---
+        with tab3:
+            st.markdown("### LATEST MARKET INTELLIGENCE")
+            if news_data:
+                for article in news_data[:6]: # Show top 6
+                    title = article.get('title', 'Unknown Intel')
+                    publisher = article.get('publisher', 'Unknown Source')
+                    link = article.get('link', '#')
+                    # Parse unix timestamp if available
+                    pub_time = article.get('providerPublishTime')
+                    date_str = datetime.fromtimestamp(pub_time).strftime('%Y-%m-%d %H:%M:%S UTC') if pub_time else "Recent"
+                    
+                    st.markdown(f"""
+                        <div class="news-card">
+                            <a href="{link}" target="_blank">{title}</a>
+                            <div class="news-date">SOURCE: {publisher.upper()} // LOGGED: {date_str}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("NO RECENT INTELLIGENCE LOGGED FOR THIS ASSET.")
