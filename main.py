@@ -1,159 +1,164 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from supabase import create_client, Client
 from streamlit_cookies_controller import CookieController
+from datetime import datetime
 
-# --- 1. SETTINGS & MODERN APP CSS ---
-st.set_page_config(page_title="Titan V1", page_icon="⚛", layout="wide")
+# --- 1. SETTINGS & INSTITUTIONAL CSS ---
+st.set_page_config(page_title="Titan Institutional | V2", page_icon="🏛", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background: radial-gradient(circle at top, #0f172a 0%, #020617 100%); background-size: cover; color: #e2e8f0; }
-    h1, h2, h3 { color: #38bdf8; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;}
-    div[data-testid="column"] { display: flex; align-items: center; }
-    .stButton>button, .stButton>button * { border-radius: 6px; font-weight: 800; width: 100%; transition: all 0.2s ease; border: none !important; color: #0f172a !important; }
-    .add-btn .stButton>button { background: #0ea5e9 !important; box-shadow: 0px 4px 10px rgba(14, 165, 233, 0.3); }
-    .add-btn .stButton>button:hover { background: #38bdf8 !important; transform: translateY(-2px); }
-    .action-btn .stButton>button { background: #3b82f6 !important; box-shadow: 0px 4px 10px rgba(59, 130, 246, 0.3); }
-    .action-btn .stButton>button:hover { background: #60a5fa !important; transform: scale(1.02); }
-    .remove-btn .stButton>button { background: #f87171 !important; box-shadow: 0px 4px 10px rgba(248, 113, 113, 0.2); }
-    .remove-btn .stButton>button:hover { background: #fca5a5 !important; transform: scale(1.02); }
-    .auth-box { background: #0f172a; padding: 2rem; border-radius: 8px; border: 1px solid #1e293b; border-left: 4px solid #3b82f6; box-shadow: 0px 10px 30px rgba(0,0,0,0.5);}
-    .hero-title { text-align: center; padding: 3rem 0 1rem 0; }
-    .hero-title h1 { font-size: 4.5rem; margin-bottom: 0; text-shadow: 0px 0px 20px rgba(14, 165, 233, 0.4); }
-    .hero-title h3 { color: #64748b; margin-top: 0; letter-spacing: 5px; font-size: 1.2rem; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+    
+    /* Global Styles */
+    .stApp { background-color: #0A0A0A; color: #F8FAFC; font-family: 'Inter', sans-serif; }
+    h1, h2, h3, h4 { font-family: 'Inter', sans-serif; font-weight: 800; color: #FFFFFF; }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    
+    /* Modern Glass Cards */
+    .glass-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(12px); border-radius: 12px; padding: 24px; margin-bottom: 16px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .glass-card:hover { border-color: rgba(56, 189, 248, 0.4); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+    
+    /* Button Overhauls */
+    .stButton>button { border-radius: 8px !important; font-weight: 600 !important; width: 100%; transition: all 0.3s ease !important; border: 1px solid transparent !important; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.6rem 1.2rem !important; }
+    
+    .btn-primary .stButton>button { background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important; color: white !important; box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.3) !important; }
+    .btn-primary .stButton>button:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important; border-color: rgba(255,255,255,0.2) !important; }
+    
+    .btn-danger .stButton>button { background: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.3) !important; }
+    .btn-danger .stButton>button:hover { background: rgba(239, 68, 68, 0.2) !important; border-color: #ef4444 !important; }
+
+    .btn-ghost .stButton>button { background: rgba(255, 255, 255, 0.05) !important; color: #94a3b8 !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
+    .btn-ghost .stButton>button:hover { background: rgba(255, 255, 255, 0.1) !important; color: white !important; }
+
+    /* Login Screen */
+    .auth-wrapper { max-width: 450px; margin: 5rem auto; }
+    .hero-title { text-align: center; margin-bottom: 2rem; }
+    .hero-title h1 { font-size: 3.5rem; letter-spacing: -1px; margin-bottom: 0.5rem; background: -webkit-linear-gradient(45deg, #38bdf8, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-title p { color: #64748b; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; }
+    
+    /* Metrics Override */
+    div[data-testid="stMetricValue"] { font-size: 1.8rem !important; font-weight: 800 !important; }
+    div[data-testid="stMetricDelta"] svg { display: none; } /* Hide default arrow */
+    
+    hr { border-color: rgba(255,255,255,0.1); }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 2. CLOUD INFRASTRUCTURE ---
 @st.cache_resource
 def init_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
+    try:
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        return create_client(url, key)
+    except:
+        st.error("Missing Supabase secrets. Please check your st.secrets file.")
+        st.stop()
 
 supabase = init_connection()
 cookie_controller = CookieController()
 
 # --- 3. DATA DICTIONARIES ---
 TICKER_DATA = {
-    "AAPL": {"name": "Apple Inc.", "domain": "apple.com", "sector": "Technology"},
-    "MSFT": {"name": "Microsoft", "domain": "microsoft.com", "sector": "Technology"},
-    "GOOGL": {"name": "Alphabet", "domain": "abc.xyz", "sector": "Communication"},
-    "AMZN": {"name": "Amazon", "domain": "amazon.com", "sector": "Consumer Cyclical"},
-    "META": {"name": "Meta Platforms", "domain": "meta.com", "sector": "Communication"},
-    "TSLA": {"name": "Tesla", "domain": "tesla.com", "sector": "Consumer Cyclical"},
-    "NVDA": {"name": "NVIDIA", "domain": "nvidia.com", "sector": "Technology"},
-    "NFLX": {"name": "Netflix", "domain": "netflix.com", "sector": "Communication"},
-    "AMD": {"name": "Advanced Micro Devices", "domain": "amd.com", "sector": "Technology"},
-    "INTC": {"name": "Intel", "domain": "intel.com", "sector": "Technology"},
-    "BA": {"name": "Boeing", "domain": "boeing.com", "sector": "Industrials"},
-    "DIS": {"name": "Disney", "domain": "thewaltdisneycompany.com", "sector": "Communication"},
-    "V": {"name": "Visa", "domain": "visa.com", "sector": "Financials"},
-    "JPM": {"name": "JPMorgan Chase", "domain": "jpmorganchase.com", "sector": "Financials"},
-    "WMT": {"name": "Walmart", "domain": "walmart.com", "sector": "Consumer Defensive"},
-    "T": {"name": "AT&T", "domain": "att.com", "sector": "Communication"},
-    "XOM": {"name": "Exxon Mobil", "domain": "exxonmobil.com", "sector": "Energy"},
-    "CVX": {"name": "Chevron", "domain": "chevron.com", "sector": "Energy"},
-    "PG": {"name": "Procter & Gamble", "domain": "pg.com", "sector": "Consumer Defensive"},
-    "KO": {"name": "Coca-Cola", "domain": "coca-colacompany.com", "sector": "Consumer Defensive"},
-    "PEP": {"name": "PepsiCo", "domain": "pepsico.com", "sector": "Consumer Defensive"},
-    "CSCO": {"name": "Cisco", "domain": "cisco.com", "sector": "Technology"},
-    "PFE": {"name": "Pfizer", "domain": "pfizer.com", "sector": "Healthcare"},
-    "MRK": {"name": "Merck", "domain": "merck.com", "sector": "Healthcare"},
-    "ABBV": {"name": "AbbVie", "domain": "abbvie.com", "sector": "Healthcare"}
+    "AAPL": {"name": "Apple Inc.", "domain": "apple.com"},
+    "MSFT": {"name": "Microsoft", "domain": "microsoft.com"},
+    "GOOGL": {"name": "Alphabet", "domain": "abc.xyz"},
+    "AMZN": {"name": "Amazon", "domain": "amazon.com"},
+    "TSLA": {"name": "Tesla", "domain": "tesla.com"},
+    "NVDA": {"name": "NVIDIA", "domain": "nvidia.com"},
+    "META": {"name": "Meta Platforms", "domain": "meta.com"},
+    "JPM": {"name": "JPMorgan Chase", "domain": "jpmorganchase.com"},
+    "V": {"name": "Visa", "domain": "visa.com"},
+    "WMT": {"name": "Walmart", "domain": "walmart.com"}
 }
 DEFAULT_TICKERS = list(TICKER_DATA.keys())
 
-# --- 4. SESSION & COOKIE STATE MANAGEMENT ---
+# --- 4. SESSION MANAGEMENT ---
 if 'current_view' not in st.session_state: st.session_state.current_view = 'home'
 if 'active_ticker' not in st.session_state: st.session_state.active_ticker = None
 if 'my_tickers' not in st.session_state: st.session_state.my_tickers = DEFAULT_TICKERS.copy()
 
 saved_cookie = cookie_controller.get("titan_session")
-
 if 'user_email' not in st.session_state: 
-    if saved_cookie:
-        st.session_state.user_email = saved_cookie
-    else:
-        st.session_state.user_email = None
+    st.session_state.user_email = saved_cookie if saved_cookie else None
 
-# --- 5. SECURE DATABASE, METADATA & CACHING LOGIC ---
+# --- 5. ENHANCED DATA FETCHING (FREE/KEYLESS APIs) ---
 def load_user_data():
     if st.session_state.user_email:
-        response = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
-        if response.data:
-            st.session_state.my_tickers = response.data[0]['tickers']
-        else:
-            st.session_state.my_tickers = DEFAULT_TICKERS.copy()
-            save_user_data()
+        res = supabase.table("secure_watchlists").select("tickers").eq("email", st.session_state.user_email).execute()
+        if res.data: st.session_state.my_tickers = res.data[0]['tickers']
+        else: save_user_data()
 
 def save_user_data():
     if st.session_state.user_email:
         supabase.table("secure_watchlists").upsert({"email": st.session_state.user_email, "tickers": st.session_state.my_tickers}).execute()
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def get_cached_history(ticker_sym):
     try:
         stock = yf.Ticker(ticker_sym)
-        return stock.history(period="3mo")
+        df = stock.history(period="6mo")
+        if not df.empty:
+            # Calculate Moving Averages for pro chart
+            df['SMA_20'] = df['Close'].rolling(window=20).mean()
+            df['SMA_50'] = df['Close'].rolling(window=50).mean()
+        return df, stock.info, stock.news
     except Exception:
-        return pd.DataFrame()
+        return pd.DataFrame(), {},[]
 
-# NEW: Dynamically scrapes company data for custom tickers
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_dynamic_info(ticker_sym):
     try:
-        stock = yf.Ticker(ticker_sym)
-        info = stock.info
+        info = yf.Ticker(ticker_sym).info
         name = info.get("shortName", ticker_sym)
         website = info.get("website", "")
-        domain = ""
-        if website:
-            # Clean the URL to extract just the base domain
-            domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
+        domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0] if website else ""
         return name, domain
-    except Exception:
+    except:
         return ticker_sym, ""
 
-if st.session_state.user_email and st.session_state.my_tickers == DEFAULT_TICKERS:
-    load_user_data()
+if st.session_state.user_email and st.session_state.my_tickers == DEFAULT_TICKERS: load_user_data()
 
-# --- 6. AUTHENTICATION GATEWAY ---
+# --- 6. AUTHENTICATION GATEWAY (PROFESSIONAL UI) ---
 if st.session_state.user_email is None:
-    st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS</h3></div>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8;'>Secure Institutional Terminal • Authorized Personnel Only</p><br>", unsafe_allow_html=True)
+    st.markdown("<div class='auth-wrapper'>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-title'><h1>TITAN Terminal</h1><p>Institutional Market Intelligence</p></div>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown('<div class="auth-box">', unsafe_allow_html=True)
-        auth_mode = st.radio("System Access:", ["Authenticate", "Request Allocation"], horizontal=True)
-        email = st.text_input("Operator ID (Email)")
-        password = st.text_input("Encryption Key (Password)", type="password")
-        
-        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-        if st.button("🔐 INITIATE HANDSHAKE"):
-            if auth_mode == "Request Allocation":
-                try:
-                    supabase.auth.sign_up({"email": email, "password": password})
-                    st.success("Credentials logged. Proceed to authenticate.")
-                except Exception as e:
-                    st.error(f"Registration Error: {e}")
-            elif auth_mode == "Authenticate":
-                try:
-                    res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    st.session_state.user_email = res.user.email
-                    cookie_controller.set("titan_session", res.user.email)
-                    load_user_data() 
-                    st.rerun() 
-                except Exception as e:
-                    st.error("ERR_CONNECTION_REFUSED: Invalid credentials.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    auth_mode = st.radio("Authentication Required", ["Sign In", "Request Access"], horizontal=True, label_visibility="collapsed")
+    st.write("")
+    email = st.text_input("Institutional Email")
+    password = st.text_input("Access Key", type="password")
+    
+    st.write("")
+    st.markdown('<div class="btn-primary">', unsafe_allow_html=True)
+    if st.button("Initialize Secure Connection"):
+        if auth_mode == "Request Access":
+            try:
+                supabase.auth.sign_up({"email": email, "password": password})
+                st.success("Registration successful. You may now sign in.")
+            except Exception as e: st.error(f"Error: {e}")
+        else:
+            try:
+                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                st.session_state.user_email = res.user.email
+                cookie_controller.set("titan_session", res.user.email)
+                load_user_data() 
+                st.rerun() 
+            except: st.error("Authentication Failed. Invalid Credentials.")
+    st.markdown('</div></div></div>', unsafe_allow_html=True)
 
 # --- 7. THE TERMINAL ---
 else:
+    # Routing Functions
     def go_to_detail(ticker):
         st.session_state.active_ticker = ticker
         st.session_state.current_view = 'detail'
@@ -169,133 +174,189 @@ else:
             if len(st.session_state.my_tickers) < 50:
                 st.session_state.my_tickers.insert(0, new_ticker)
                 save_user_data()
-            else:
-                st.error("ERR_MEMORY_FULL: Max 50 assets permitted.")
 
+    # --- SIDEBAR NAV ---
     with st.sidebar:
-        st.markdown("### ⎈ ACCESS CONTROL")
-        st.markdown(f"<div style='background-color: #0f172a; padding: 10px; border-radius: 6px; border-left: 3px solid #3b82f6; font-family: monospace;'><b>USER:</b><br>{st.session_state.user_email}</div><br>", unsafe_allow_html=True)
-        st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-        if st.button("🔒 TERMINATE SESSION"):
+        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Globe_icon_%28white%29.svg/2048px-Globe_icon_%28white%29.svg.png", width=40)
+        st.markdown("### TITAN V2")
+        st.markdown(f"<div style='color:#64748b; font-size: 12px;'>OPERATOR ID:<br><span style='color:#38bdf8;'>{st.session_state.user_email}</span></div><br>", unsafe_allow_html=True)
+        
+        st.markdown('<div class="btn-ghost">', unsafe_allow_html=True)
+        if st.button("🏠 Dashboard"): go_to_home()
+        st.markdown('</div><br><br>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="btn-danger" style="position: absolute; bottom: 20px; width: 85%;">', unsafe_allow_html=True)
+        if st.button("Disconnect Session"):
             supabase.auth.sign_out()
             cookie_controller.remove("titan_session")
             st.session_state.user_email = None
-            st.session_state.my_tickers = DEFAULT_TICKERS.copy()
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- HOME PAGE (COMMAND CENTER) ---
+    # --- HOME DASHBOARD ---
     if st.session_state.current_view == 'home':
-        st.markdown("<div class='hero-title'><h1><span style='color: #0ea5e9;'>⚛</span> TITAN</h1><h3>MACRO-FORENSICS TERMINAL</h3></div>", unsafe_allow_html=True)
-        st.divider()
-
-        st.subheader("⎘ INJECT NEW ASSET")
-        c1, c2 = st.columns([4, 1])
+        st.markdown("<h2>Global Equities Portfolio</h2>", unsafe_allow_html=True)
+        
+        # Add Ticker Bar
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        c1, c2 = st.columns([5, 1])
         with c1:
-            new_asset = st.text_input("Enter Symbology (e.g., PLTR, SPY, RELIANCE.NS):", label_visibility="collapsed").strip().upper()
+            new_asset = st.text_input("Add Asset (e.g., PLTR, AAPL, RELIANCE.NS):", label_visibility="collapsed", placeholder="Enter Ticker Symbol...").strip().upper()
         with c2:
-            st.markdown('<div class="add-btn">', unsafe_allow_html=True)
-            if st.button("➕ ADD TO INDEX"):
+            st.markdown('<div class="btn-primary">', unsafe_allow_html=True)
+            if st.button("+ Add Asset"):
                 add_ticker(new_asset)
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.write("")
-        st.subheader(f"≣ ACTIVE WATCHLIST ({len(st.session_state.my_tickers)}/50)")
+        # Watchlist Grid
+        st.markdown(f"<h4 style='color:#94a3b8; font-size:14px; margin-top:30px;'>TRACKED ASSETS ({len(st.session_state.my_tickers)}/50)</h4>", unsafe_allow_html=True)
         
         for ticker in st.session_state.my_tickers:
-            # If it's a default ticker, use the fast dictionary. If custom, scrape dynamically.
             if ticker in TICKER_DATA:
-                t_name = TICKER_DATA[ticker]["name"]
-                t_domain = TICKER_DATA[ticker]["domain"]
+                t_name, t_domain = TICKER_DATA[ticker]["name"], TICKER_DATA[ticker]["domain"]
             else:
                 t_name, t_domain = get_dynamic_info(ticker)
             
-            fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=0f172a&color=0ea5e9&bold=true"
-            logo_url = f"https://www.google.com/s2/favicons?domain={t_domain}&sz=128" if t_domain else fallback_url
+            # Use High-Quality Clearbit Logo API
+            fallback_url = f"https://ui-avatars.com/api/?name={ticker}&background=1e293b&color=38bdf8&bold=true"
+            logo_url = f"https://logo.clearbit.com/{t_domain}" if t_domain else fallback_url
             
-            col1, col2, col3, col4 = st.columns([1.5, 3.5, 2, 1.5])
+            st.markdown('<div class="glass-card" style="padding: 12px 24px; margin-bottom: 10px;">', unsafe_allow_html=True)
+            col1, col2, col3, col4 = st.columns([2, 4, 1.5, 1.5])
             
             with col1: 
                 st.markdown(f"""
-                    <div style="display: flex; align-items: center; gap: 12px; padding-top: 4px;">
-                        <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="30" height="30" style="border-radius: 6px; object-fit: contain; background-color: #ffffff; padding: 2px;">
-                        <span style="font-weight: bold; font-size: 1.1em;">{ticker}</span>
+                    <div style="display: flex; align-items: center; gap: 16px; height: 100%;">
+                        <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="36" height="36" style="border-radius: 50%; object-fit: contain; background: white; padding: 4px;">
+                        <span style="font-weight: 800; font-size: 1.2rem;">{ticker}</span>
                     </div>
                 """, unsafe_allow_html=True)
-                
             with col2: 
-                st.markdown(f"<div style='color: #94a3b8; padding-top: 8px;'>{t_name}</div>", unsafe_allow_html=True)
-            
+                st.markdown(f"<div style='color: #cbd5e1; font-weight: 400; padding-top: 8px;'>{t_name}</div>", unsafe_allow_html=True)
             with col3: 
-                st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-                st.button("🔍 ANALYZE", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
+                st.markdown('<div class="btn-primary">', unsafe_allow_html=True)
+                st.button("Analyze", key=f"view_{ticker}", on_click=go_to_detail, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
             with col4: 
-                st.markdown('<div class="remove-btn">', unsafe_allow_html=True)
-                st.button("❌ REMOVE", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
+                st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
+                st.button("Remove", key=f"rem_{ticker}", on_click=remove_ticker, args=(ticker,))
                 st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 0.2em 0; border: 0.5px solid #1e293b;'>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- DETAIL PAGE ---
+    # --- DETAIL ANALYSIS PAGE ---
     elif st.session_state.current_view == 'detail':
         ticker_sym = st.session_state.active_ticker
         
-        if ticker_sym in TICKER_DATA:
-            t_name = TICKER_DATA[ticker_sym]["name"]
-            t_domain = TICKER_DATA[ticker_sym]["domain"]
-        else:
-            t_name, t_domain = get_dynamic_info(ticker_sym)
-            
-        fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=0f172a&color=0ea5e9&bold=true"
-        logo_url = f"https://www.google.com/s2/favicons?domain={t_domain}&sz=128" if t_domain else fallback_url
+        t_name, t_domain = get_dynamic_info(ticker_sym)
+        fallback_url = f"https://ui-avatars.com/api/?name={ticker_sym}&background=1e293b&color=38bdf8&bold=true"
+        logo_url = f"https://logo.clearbit.com/{t_domain}" if t_domain else fallback_url
         
-        c1, c2 = st.columns([4, 1])
+        # Header Row
+        st.markdown('<div class="glass-card" style="padding: 15px 24px;">', unsafe_allow_html=True)
+        c1, c2 = st.columns([5, 1])
         with c1: 
             st.markdown(f"""
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="40" height="40" style="border-radius: 8px; object-fit: contain; background-color: #ffffff; padding: 2px;">
-                    <h1 style="margin: 0;"><span style='color: #0ea5e9;'>⚛</span> {ticker_sym} <span style="font-size: 0.6em; color: #64748b;">// {t_name}</span></h1>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" width="56" height="56" style="border-radius: 12px; background: white; padding: 6px;">
+                    <div>
+                        <h1 style="margin: 0; font-size: 2.2rem;">{ticker_sym}</h1>
+                        <span style="color: #94a3b8; font-size: 1.1rem;">{t_name}</span>
+                    </div>
                 </div>
             """, unsafe_allow_html=True)
-            
         with c2: 
-            st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-            st.button("⬅ RETURN", on_click=go_to_home, use_container_width=True)
+            st.markdown('<div class="btn-ghost" style="margin-top: 10px;">', unsafe_allow_html=True)
+            st.button("Back", on_click=go_to_home)
             st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        st.write("")
-        with st.spinner(f"Establishing secure telemetry for {ticker_sym}..."):
-            df = get_cached_history(ticker_sym)
+        with st.spinner(f"Aggregating market data for {ticker_sym}..."):
+            df, info, news = get_cached_history(ticker_sym)
             
         if not df.empty:
-            latest_close = df['Close'].iloc[-1]
-            latest_open = df['Open'].iloc[-1]
-            latest_vol = df['Volume'].iloc[-1]
-            price_delta = latest_close - df['Close'].iloc[-2]
+            # Metrics Logic
+            close = df['Close'].iloc[-1]
+            prev_close = df['Close'].iloc[-2]
+            delta = close - prev_close
+            pct_change = (delta / prev_close) * 100
+            color = "#10b981" if delta >= 0 else "#ef4444"
+            sign = "+" if delta >= 0 else ""
             
-            st.write("---")
+            # Key Statistics Row
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Latest Close", f"${latest_close:,.2f}", f"${price_delta:,.2f}")
-            m2.metric("Latest Open", f"${latest_open:,.2f}")
-            m3.metric("Daily Trade Volume", f"{latest_vol:,.0f}")
-            m4.metric("Telemetry Window", "90 Days")
-            st.write("---")
             
-            chart_type = st.radio("Visualization Matrix:", ["Standard Output", "Pro (Candlestick)"], horizontal=True)
+            with m1:
+                st.markdown("<p style='color:#94a3b8; margin:0; font-size:0.9rem;'>Current Price</p>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='margin:0;'>${close:,.2f} <span style='color:{color}; font-size:1.2rem;'>{sign}{delta:,.2f} ({sign}{pct_change:.2f}%)</span></h2>", unsafe_allow_html=True)
+            with m2:
+                mkt_cap = info.get('marketCap', 'N/A')
+                mkt_cap_fmt = f"${mkt_cap / 1e9:.2f}B" if isinstance(mkt_cap, (int, float)) else "N/A"
+                st.markdown("<p style='color:#94a3b8; margin:0; font-size:0.9rem;'>Market Cap</p>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='margin:0;'>{mkt_cap_fmt}</h2>", unsafe_allow_html=True)
+            with m3:
+                vol = info.get('volume', df['Volume'].iloc[-1])
+                vol_fmt = f"{vol / 1e6:.2f}M" if vol else "N/A"
+                st.markdown("<p style='color:#94a3b8; margin:0; font-size:0.9rem;'>Volume</p>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='margin:0;'>{vol_fmt}</h2>", unsafe_allow_html=True)
+            with m4:
+                pe = info.get('trailingPE', 'N/A')
+                pe_fmt = f"{pe:.2f}" if isinstance(pe, (int, float)) else "N/A"
+                st.markdown("<p style='color:#94a3b8; margin:0; font-size:0.9rem;'>P/E Ratio</p>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='margin:0;'>{pe_fmt}</h2>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             
-            if chart_type == "Standard Output":
-                col1, col2 = st.columns([2, 1])
-                with col1: 
-                    st.markdown("**Price Action Trend**")
-                    st.line_chart(df['Close'], color="#0ea5e9")
-                with col2: 
-                    st.markdown("**Institutional Volume**")
-                    st.bar_chart(df['Volume'], color="#1e293b")
-            else: 
-                st.markdown("**Candlestick Price Action**")
-                fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
-                fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=0, b=0), height=400)
-                st.plotly_chart(fig, use_container_width=True)
+            # Tabs for Chart vs News
+            tab1, tab2 = st.tabs(["📊 Technical Chart", "📰 News Flow"])
+            
+            with tab1:
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+                chart_type = st.radio("Chart Type:",["Advanced Candlestick", "Line Chart"], horizontal=True, label_visibility="collapsed")
+                
+                if chart_type == "Advanced Candlestick":
+                    # TradingView Style Chart using Plotly Subplots
+                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.75, 0.25])
+                    
+                    # Candlestick
+                    fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
+                    # Moving Averages
+                    fig.add_trace(go.Scatter(x=df.index, y=df['SMA_20'], line=dict(color='#38bdf8', width=1.5), name="20 SMA"), row=1, col=1)
+                    fig.add_trace(go.Scatter(x=df.index, y=df['SMA_50'], line=dict(color='#f59e0b', width=1.5), name="50 SMA"), row=1, col=1)
+                    
+                    # Volume
+                    colors = ['#10b981' if row['Close'] - row['Open'] >= 0 else '#ef4444' for index, row in df.iterrows()]
+                    fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=colors, name="Volume"), row=2, col=1)
+                    
+                    fig.update_layout(
+                        template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        margin=dict(l=0, r=0, t=10, b=0), height=600, showlegend=False,
+                        xaxis_rangeslider_visible=False
+                    )
+                    fig.update_yaxes(gridcolor='rgba(255,255,255,0.05)', title_text="Price", row=1, col=1)
+                    fig.update_yaxes(gridcolor='rgba(255,255,255,0.05)', title_text="Volume", row=2, col=1)
+                    fig.update_xaxes(gridcolor='rgba(255,255,255,0.05)')
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.line_chart(df['Close'], color="#38bdf8", height=500)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            with tab2:
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+                if news:
+                    for article in news[:5]: # Show top 5 recent articles
+                        pub_time = datetime.fromtimestamp(article.get('providerPublishTime', 0)).strftime('%Y-%m-%d %H:%M')
+                        st.markdown(f"""
+                            <div style="padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px;">
+                                <div style="color: #38bdf8; font-size: 0.8rem; margin-bottom: 5px;">{article.get('publisher', 'News')} • {pub_time}</div>
+                                <a href="{article.get('link', '#')}" target="_blank" style="color: white; text-decoration: none; font-size: 1.1rem; font-weight: 600;">{article.get('title', 'No Title')}</a>
+                            </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("No recent news feed available for this asset.")
+                st.markdown('</div>', unsafe_allow_html=True)
+
         else:
-            st.error(f"ERR_DATA_NULL: Telemetry for {ticker_sym} failed. Ensure the ticker is valid (e.g., use .NS for Indian stocks).")
+            st.error(f"Failed to fetch market data for {ticker_sym}. Please verify the ticker symbol.")
